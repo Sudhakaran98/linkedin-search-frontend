@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { closeProfile } from '../store/searchSlice';
 import { ProfileDetail, useGetProfileDetailQuery } from '../store/searchApi';
+import { ProfileDetail, useGetProfileDetailQuery } from '../store/searchApi';
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return 'Present';
