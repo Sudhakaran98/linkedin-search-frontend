@@ -61,6 +61,7 @@ export interface Skill {
 }
 
 export interface ProfileDetail {
+  [key: string]: unknown;
   id: string;
   full_name: string;
   headline?: string;

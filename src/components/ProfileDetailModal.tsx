@@ -1,17 +1,15 @@
 import React, { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { closeProfile } from '../store/searchSlice';
-import { useGetProfileDetailQuery } from '../store/searchApi';
+import { ProfileDetail, useGetProfileDetailQuery } from '../store/searchApi';
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return 'Present';
   if (dateStr.length === 4) return dateStr;
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  } catch {
-    return dateStr;
-  }
+  const d = new Date(dateStr);
+  return Number.isNaN(d.getTime())
+    ? dateStr
+    : d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
 function formatDuration(months?: number): string {
@@ -23,17 +21,192 @@ function formatDuration(months?: number): string {
   return `${mos} mo`;
 }
 
+type GenericRecord = Record<string, unknown>;
+
+type DynamicSection = {
+  key: string;
+  title: string;
+  icon: string;
+  items: GenericRecord[];
+};
+
+const SECTION_META: Record<string, { title: string; icon: string }> = {
+  certifications: { title: 'Certifications', icon: '📜' },
+  courses: { title: 'Courses', icon: '📚' },
+  honors: { title: 'Honors & Awards', icon: '🏆' },
+  patents: { title: 'Patents', icon: '💡' },
+  projects: { title: 'Projects', icon: '🧩' },
+  publications: { title: 'Publications', icon: '📰' },
+  test_scores: { title: 'Test Scores', icon: '📈' },
+  volunteer_experiences: { title: 'Volunteer Experience', icon: '🤝' },
+  organizations: { title: 'Organizations', icon: '🏢' },
+  languages: { title: 'Languages', icon: '🗣️' },
+};
+
+const RESERVED_SECTION_KEYS = new Set([
+  'id',
+  'full_name',
+  'headline',
+  'picture_url',
+  'location_full',
+  'location_city',
+  'location_country',
+  'summary',
+  'linkedin_url',
+  'connections_count',
+  'followers_count',
+  'active_experience_title',
+  'total_experience_duration_months',
+  'experiences',
+  'educations',
+  'skills',
+]);
+
+function startCase(value: string): string {
+  return value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getText(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return null;
+}
+
+function pickFirst(item: GenericRecord, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = getText(item[key]);
+    if (value) return value;
+  }
+  return null;
+}
+
+function buildMetaLine(item: GenericRecord): string | null {
+  const dateFrom = pickFirst(item, ['date_from', 'started_on', 'issued_on']);
+  const dateTo = pickFirst(item, ['date_to', 'ends_on', 'expires_on']);
+  const years = [
+    pickFirst(item, ['date_from_year']),
+    pickFirst(item, ['date_to_year']),
+  ].filter(Boolean) as string[];
+
+  const dateRange = dateFrom
+    ? `${formatDate(dateFrom)} – ${dateTo ? formatDate(dateTo) : 'Present'}`
+    : years.length > 0
+      ? `${years[0]}${years[1] ? ` – ${years[1]}` : ''}`
+      : null;
+
+  const extras = [
+    pickFirst(item, ['authority', 'issuer', 'organization', 'company_name', 'institution_name']),
+    pickFirst(item, ['location', 'display_source']),
+  ].filter(Boolean) as string[];
+
+  return [dateRange, ...extras].filter(Boolean).join(' · ') || null;
+}
+
+function buildDescriptionLines(item: GenericRecord): string[] {
+  const primaryDescription = pickFirst(item, [
+    'description',
+    'summary',
+    'blurb',
+    'notes',
+    'content',
+  ]);
+
+  const detailKeys = [
+    'associated_with',
+    'credential_id',
+    'credential_url',
+    'patent_number',
+    'inventors',
+    'authors',
+    'publication_name',
+    'publisher',
+    'grade',
+    'score',
+    'url',
+  ];
+
+  const detailLines = detailKeys
+    .map((key) => {
+      const value = getText(item[key]);
+      return value ? `${startCase(key)}: ${value}` : null;
+    })
+    .filter(Boolean) as string[];
+
+  return [primaryDescription, ...detailLines].filter(Boolean) as string[];
+}
+
+function getDynamicSections(profile: ProfileDetail): DynamicSection[] {
+  return Object.entries(profile)
+    .filter(([key, value]) => !RESERVED_SECTION_KEYS.has(key) && Array.isArray(value) && value.length > 0)
+    .map(([key, value]) => ({
+      key,
+      title: SECTION_META[key]?.title ?? startCase(key),
+      icon: SECTION_META[key]?.icon ?? '📌',
+      items: value.filter((item): item is GenericRecord => !!item && typeof item === 'object'),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
+function renderDynamicItem(item: GenericRecord, index: number) {
+  const title = pickFirst(item, [
+    'name',
+    'title',
+    'course_name',
+    'certification_name',
+    'patent_title',
+    'project_title',
+    'publication_title',
+    'organization_name',
+    'language',
+    'score_name',
+  ]) ?? `Item ${index + 1}`;
+
+  const subtitle = pickFirst(item, [
+    'subtitle',
+    'occupation',
+    'degree',
+    'license_number',
+    'proficiency',
+    'status',
+  ]);
+
+  const meta = buildMetaLine(item);
+  const descriptionLines = buildDescriptionLines(item);
+
+  return (
+    <div key={String(item.id ?? item.url ?? item.name ?? index)} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <p className="font-semibold text-gray-900">{title}</p>
+      {subtitle && <p className="mt-1 text-sm text-gray-600">{subtitle}</p>}
+      {meta && <p className="mt-1 text-xs text-gray-400">{meta}</p>}
+      {descriptionLines.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {descriptionLines.map((line, lineIndex) => (
+            <p key={`${lineIndex}-${line}`} className="text-sm leading-relaxed text-gray-500 break-words">
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProfileDetailModal() {
   const dispatch = useAppDispatch();
   const profileId = useAppSelector((s) => s.search.selectedProfileId);
 
-  // RTK Query — only fires when profileId is set
-  const { data: profile, isLoading, isError } = useGetProfileDetailQuery(
-    profileId as string,
-    { skip: !profileId }
-  );
+  const { data: profile, isLoading, isError } = useGetProfileDetailQuery(profileId as string, {
+    skip: !profileId,
+  });
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') dispatch(closeProfile());
@@ -51,30 +224,28 @@ export default function ProfileDetailModal() {
     .join('')
     .toUpperCase();
 
+  const dynamicSections = profile ? getDynamicSections(profile) : [];
+
   return (
-    /* Overlay */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={() => dispatch(closeProfile())}
     >
-      {/* Modal box */}
       <div
-        className="bg-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Blue header strip */}
-        <div className="bg-gradient-to-r from-blue-700 to-blue-500 h-28 relative flex-shrink-0">
+        <div className="relative h-32 flex-shrink-0 bg-gradient-to-r from-blue-700 to-blue-500 sm:h-36">
           <button
             onClick={() => dispatch(closeProfile())}
-            className="absolute top-3 right-3 text-white/80 hover:text-white text-2xl leading-none"
+            className="absolute right-3 top-3 text-2xl leading-none text-white/80 hover:text-white"
             aria-label="Close"
           >
             ✕
           </button>
         </div>
 
-        {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 px-6 pb-8">
+        <div className="flex-1 overflow-y-auto bg-slate-50/70 px-4 pb-8 pt-6 sm:px-6 sm:pt-8">
           {isLoading && (
             <div className="pt-10 text-center text-gray-500 animate-pulse">Loading profile…</div>
           )}
@@ -86,96 +257,124 @@ export default function ProfileDetailModal() {
           )}
 
           {profile && (
-            <div className="relative -mt-12">
-              {/* Avatar */}
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-                <div>
+            <div>
+              <section className="relative mb-8 rounded-[28px] border border-slate-200 bg-white px-5 pb-6 pt-16 shadow-sm sm:px-7 sm:pt-20">
+                <div className="absolute left-5 top-0 -translate-y-1/2 sm:left-7">
                   {profile.picture_url ? (
                     <img
                       src={profile.picture_url}
                       alt={profile.full_name}
-                      className="w-24 h-24 rounded-full border-4 border-white shadow-md object-cover mb-3"
+                      className="h-24 w-24 rounded-3xl border-4 border-white object-cover shadow-lg ring-4 ring-blue-100/70 sm:h-28 sm:w-28"
                     />
                   ) : (
-                    <div className="w-24 h-24 rounded-full border-4 border-white shadow-md bg-blue-100 text-blue-700 flex items-center justify-center text-3xl font-bold mb-3">
+                    <div className="flex h-24 w-24 items-center justify-center rounded-3xl border-4 border-white bg-blue-100 text-3xl font-bold text-blue-700 shadow-lg ring-4 ring-blue-100/70 sm:h-28 sm:w-28">
                       {initials}
                     </div>
                   )}
-                  <h2 className="text-2xl font-bold text-gray-900">{profile.full_name}</h2>
-                  {profile.headline && (
-                    <p className="text-gray-600 mt-1">{profile.headline}</p>
-                  )}
-                  <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500">
-                    {(profile.location_full || profile.location_city) && (
-                      <span>📍 {profile.location_full || [profile.location_city, profile.location_country].filter(Boolean).join(', ')}</span>
-                    )}
-                    {profile.connections_count != null && (
-                      <span>👥 {profile.connections_count}+ connections</span>
-                    )}
-                    {profile.total_experience_duration_months != null && (
-                      <span>💼 {formatDuration(profile.total_experience_duration_months)} total exp.</span>
-                    )}
-                  </div>
                 </div>
 
-                {profile.linkedin_url && (
-                  <a
-                    href={profile.linkedin_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-blue-700 transition-colors shrink-0"
-                  >
-                    🔗 View on LinkedIn
-                  </a>
-                )}
-              </div>
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h2 className="break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                        {profile.full_name}
+                      </h2>
+                      {profile.active_experience_title && (
+                        <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                          {profile.active_experience_title}
+                        </span>
+                      )}
+                    </div>
 
-              {/* About */}
+                    {profile.headline && (
+                      <p className="mt-3 max-w-3xl break-words text-base leading-7 text-slate-600 sm:text-lg">
+                        {profile.headline}
+                      </p>
+                    )}
+
+                    <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-600">
+                      {(profile.location_full || profile.location_city) && (
+                        <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5">
+                          <span aria-hidden="true">📍</span>
+                          <span>{profile.location_full || [profile.location_city, profile.location_country].filter(Boolean).join(', ')}</span>
+                        </span>
+                      )}
+                      {profile.connections_count != null && (
+                        <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5">
+                          <span aria-hidden="true">👥</span>
+                          <span>{profile.connections_count}+ connections</span>
+                        </span>
+                      )}
+                      {profile.followers_count != null && (
+                        <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5">
+                          <span aria-hidden="true">🌐</span>
+                          <span>{profile.followers_count} followers</span>
+                        </span>
+                      )}
+                      {profile.total_experience_duration_months != null && (
+                        <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5">
+                          <span aria-hidden="true">💼</span>
+                          <span>{formatDuration(profile.total_experience_duration_months)} total exp.</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {profile.linkedin_url && (
+                    <a
+                      href={profile.linkedin_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 lg:mt-2"
+                    >
+                      🔗 View on LinkedIn
+                    </a>
+                  )}
+                </div>
+              </section>
+
               {profile.summary && (
-                <section className="mb-8 bg-gray-50 rounded-xl p-5 border border-gray-100">
-                  <h3 className="font-semibold text-gray-800 mb-2 text-lg">About</h3>
-                  <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
+                <section className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h3 className="mb-3 text-xl font-semibold text-slate-800">About</h3>
+                  <p className="whitespace-pre-wrap text-base leading-8 text-slate-600">
                     {profile.summary}
                   </p>
                 </section>
               )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Experience + Education */}
-                <div className="lg:col-span-2 space-y-8">
-
-                  {/* Experience */}
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+                <div className="space-y-8 xl:col-span-8">
                   {profile.experiences && profile.experiences.length > 0 && (
                     <section>
-                      <h3 className="font-semibold text-gray-800 text-lg mb-4 flex items-center gap-2 border-b pb-2">
+                      <h3 className="mb-5 flex items-center gap-2 border-b border-slate-200 pb-3 text-xl font-semibold text-slate-800">
                         💼 Experience
                       </h3>
-                      <div className="space-y-6">
+                      <div className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                         {profile.experiences.map((exp, i) => (
-                          <div key={exp.id ?? i} className="flex gap-3">
+                          <div key={exp.id ?? i} className="flex gap-4 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
                             {exp.company_logo_url ? (
                               <img
                                 src={exp.company_logo_url}
                                 alt={exp.company_name}
-                                className="w-10 h-10 rounded border bg-white object-contain p-0.5 shrink-0"
+                                className="h-10 w-10 shrink-0 rounded border bg-white object-contain p-0.5"
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded border bg-gray-100 flex items-center justify-center text-gray-400 shrink-0">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border bg-gray-100 text-gray-400">
                                 🏢
                               </div>
                             )}
-                            <div>
-                              <p className="font-semibold text-gray-900 leading-tight">
+                            <div className="min-w-0">
+                              <p className="break-words text-xl font-semibold leading-tight text-slate-900">
                                 {exp.position_title}
                               </p>
-                              <p className="text-gray-600 text-sm">{exp.company_name}</p>
-                              <p className="text-gray-400 text-xs mt-0.5">
+                              <p className="break-words text-base text-slate-600">{exp.company_name}</p>
+                              <p className="mt-1 text-sm text-slate-400 break-words">
                                 {formatDate(exp.date_from)} – {formatDate(exp.date_to)}
                                 {exp.duration_months ? ` · ${formatDuration(exp.duration_months)}` : ''}
                                 {exp.location ? ` · ${exp.location}` : ''}
                               </p>
                               {exp.description && (
-                                <p className="text-gray-500 text-sm mt-1 leading-relaxed">
+                                <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-slate-500">
                                   {exp.description}
                                 </p>
                               )}
@@ -186,31 +385,30 @@ export default function ProfileDetailModal() {
                     </section>
                   )}
 
-                  {/* Education */}
                   {profile.educations && profile.educations.length > 0 && (
                     <section>
-                      <h3 className="font-semibold text-gray-800 text-lg mb-4 flex items-center gap-2 border-b pb-2">
+                      <h3 className="mb-5 flex items-center gap-2 border-b border-slate-200 pb-3 text-xl font-semibold text-slate-800">
                         🎓 Education
                       </h3>
-                      <div className="space-y-4">
+                      <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                         {profile.educations.map((edu, i) => (
-                          <div key={edu.id ?? i} className="flex gap-3">
+                          <div key={edu.id ?? i} className="flex gap-4 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
                             {edu.institution_logo_url ? (
                               <img
                                 src={edu.institution_logo_url}
                                 alt={edu.institution_name}
-                                className="w-10 h-10 rounded border bg-white object-contain p-0.5 shrink-0"
+                                className="h-10 w-10 shrink-0 rounded border bg-white object-contain p-0.5"
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded border bg-gray-100 flex items-center justify-center text-gray-400 shrink-0">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border bg-gray-100 text-gray-400">
                                 🏫
                               </div>
                             )}
-                            <div>
-                              <p className="font-semibold text-gray-900">{edu.institution_name}</p>
-                              <p className="text-gray-600 text-sm">{edu.degree}</p>
+                            <div className="min-w-0">
+                              <p className="break-words text-lg font-semibold text-slate-900">{edu.institution_name}</p>
+                              <p className="break-words text-base text-slate-600">{edu.degree}</p>
                               {(edu.date_from_year || edu.date_to_year) && (
-                                <p className="text-gray-400 text-xs">
+                                <p className="text-sm text-slate-400">
                                   {edu.date_from_year} – {edu.date_to_year ?? 'Present'}
                                 </p>
                               )}
@@ -220,26 +418,39 @@ export default function ProfileDetailModal() {
                       </div>
                     </section>
                   )}
+
+                  {dynamicSections.map((section) => (
+                    <section key={section.key}>
+                      <h3 className="mb-5 flex items-center gap-2 border-b border-slate-200 pb-3 text-xl font-semibold text-slate-800">
+                        <span>{section.icon}</span>
+                        <span>{section.title}</span>
+                      </h3>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        {section.items.map((item, index) => renderDynamicItem(item, index))}
+                      </div>
+                    </section>
+                  ))}
                 </div>
 
-                {/* Skills sidebar */}
-                {profile.skills && profile.skills.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-gray-800 text-lg mb-4 border-b pb-2">
-                      🛠 Skills
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.skills.map((s, i) => (
-                        <span
-                          key={i}
-                          className="bg-blue-50 text-blue-700 border border-blue-100 text-xs font-medium px-3 py-1 rounded-full"
-                        >
-                          {s.skill_name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <div className="space-y-6 xl:col-span-4">
+                  {profile.skills && profile.skills.length > 0 && (
+                    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <h3 className="mb-5 border-b border-slate-200 pb-3 text-xl font-semibold text-slate-800">
+                        🛠 Skills
+                      </h3>
+                      <div className="flex flex-wrap gap-2.5">
+                        {profile.skills.map((s, i) => (
+                          <span
+                            key={i}
+                            className="rounded-full border border-blue-100 bg-blue-50 px-3.5 py-1.5 text-sm font-medium text-blue-700"
+                          >
+                            {s.skill_name}
+                          </span>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </div>
               </div>
             </div>
           )}
