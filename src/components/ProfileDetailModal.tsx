@@ -245,7 +245,7 @@ export default function ProfileDetailModal() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-8 pt-0 sm:px-6">
+        <div className="flex-1 overflow-y-auto bg-slate-50/70 px-4 pb-8 pt-6 sm:px-6 sm:pt-8">
           {isLoading && (
             <div className="pt-10 text-center text-gray-500 animate-pulse">Loading profile…</div>
           )}
@@ -257,58 +257,86 @@ export default function ProfileDetailModal() {
           )}
 
           {profile && (
-            <div className="relative -mt-16 sm:-mt-20">
-              <div className="mb-8 flex flex-col gap-5 rounded-2xl bg-white/95 p-1 sm:flex-row sm:items-end sm:justify-between">
-                <div className="min-w-0">
+            <div>
+              <section className="relative mb-8 rounded-[28px] border border-slate-200 bg-white px-5 pb-6 pt-16 shadow-sm sm:px-7 sm:pt-20">
+                <div className="absolute left-5 top-0 -translate-y-1/2 sm:left-7">
                   {profile.picture_url ? (
                     <img
                       src={profile.picture_url}
                       alt={profile.full_name}
-                      className="mb-4 h-24 w-24 rounded-full border-4 border-white object-cover shadow-md"
+                      className="h-24 w-24 rounded-3xl border-4 border-white object-cover shadow-lg ring-4 ring-blue-100/70 sm:h-28 sm:w-28"
                     />
                   ) : (
-                    <div className="mb-4 flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-blue-100 text-3xl font-bold text-blue-700 shadow-md">
+                    <div className="flex h-24 w-24 items-center justify-center rounded-3xl border-4 border-white bg-blue-100 text-3xl font-bold text-blue-700 shadow-lg ring-4 ring-blue-100/70 sm:h-28 sm:w-28">
                       {initials}
                     </div>
                   )}
-                  <h2 className="break-words text-2xl font-bold text-gray-900 sm:text-3xl">{profile.full_name}</h2>
-                  {profile.headline && (
-                    <p className="mt-2 break-words text-gray-600">{profile.headline}</p>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-500">
-                    {(profile.location_full || profile.location_city) && (
-                      <span>
-                        📍 {profile.location_full || [profile.location_city, profile.location_country].filter(Boolean).join(', ')}
-                      </span>
-                    )}
-                    {profile.connections_count != null && (
-                      <span>👥 {profile.connections_count}+ connections</span>
-                    )}
-                    {profile.followers_count != null && (
-                      <span>🌐 {profile.followers_count} followers</span>
-                    )}
-                    {profile.total_experience_duration_months != null && (
-                      <span>💼 {formatDuration(profile.total_experience_duration_months)} total exp.</span>
-                    )}
-                  </div>
                 </div>
 
-                {profile.linkedin_url && (
-                  <a
-                    href={profile.linkedin_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex shrink-0 items-center gap-2 self-start rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 sm:self-end"
-                  >
-                    🔗 View on LinkedIn
-                  </a>
-                )}
-              </div>
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h2 className="break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                        {profile.full_name}
+                      </h2>
+                      {profile.active_experience_title && (
+                        <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                          {profile.active_experience_title}
+                        </span>
+                      )}
+                    </div>
+
+                    {profile.headline && (
+                      <p className="mt-3 max-w-3xl break-words text-base leading-7 text-slate-600 sm:text-lg">
+                        {profile.headline}
+                      </p>
+                    )}
+
+                    <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-600">
+                      {(profile.location_full || profile.location_city) && (
+                        <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5">
+                          <span aria-hidden="true">📍</span>
+                          <span>{profile.location_full || [profile.location_city, profile.location_country].filter(Boolean).join(', ')}</span>
+                        </span>
+                      )}
+                      {profile.connections_count != null && (
+                        <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5">
+                          <span aria-hidden="true">👥</span>
+                          <span>{profile.connections_count}+ connections</span>
+                        </span>
+                      )}
+                      {profile.followers_count != null && (
+                        <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5">
+                          <span aria-hidden="true">🌐</span>
+                          <span>{profile.followers_count} followers</span>
+                        </span>
+                      )}
+                      {profile.total_experience_duration_months != null && (
+                        <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5">
+                          <span aria-hidden="true">💼</span>
+                          <span>{formatDuration(profile.total_experience_duration_months)} total exp.</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {profile.linkedin_url && (
+                    <a
+                      href={profile.linkedin_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 lg:mt-2"
+                    >
+                      🔗 View on LinkedIn
+                    </a>
+                  )}
+                </div>
+              </section>
 
               {profile.summary && (
-                <section className="mb-8 rounded-xl border border-gray-100 bg-gray-50 p-5">
-                  <h3 className="mb-2 text-lg font-semibold text-gray-800">About</h3>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-600">
+                <section className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h3 className="mb-3 text-xl font-semibold text-slate-800">About</h3>
+                  <p className="whitespace-pre-wrap text-base leading-8 text-slate-600">
                     {profile.summary}
                   </p>
                 </section>
@@ -318,12 +346,12 @@ export default function ProfileDetailModal() {
                 <div className="space-y-8 xl:col-span-8">
                   {profile.experiences && profile.experiences.length > 0 && (
                     <section>
-                      <h3 className="mb-4 flex items-center gap-2 border-b pb-2 text-lg font-semibold text-gray-800">
+                      <h3 className="mb-5 flex items-center gap-2 border-b border-slate-200 pb-3 text-xl font-semibold text-slate-800">
                         💼 Experience
                       </h3>
-                      <div className="space-y-6">
+                      <div className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                         {profile.experiences.map((exp, i) => (
-                          <div key={exp.id ?? i} className="flex gap-3">
+                          <div key={exp.id ?? i} className="flex gap-4 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
                             {exp.company_logo_url ? (
                               <img
                                 src={exp.company_logo_url}
@@ -336,17 +364,17 @@ export default function ProfileDetailModal() {
                               </div>
                             )}
                             <div className="min-w-0">
-                              <p className="leading-tight font-semibold text-gray-900 break-words">
+                              <p className="break-words text-xl font-semibold leading-tight text-slate-900">
                                 {exp.position_title}
                               </p>
-                              <p className="text-sm text-gray-600 break-words">{exp.company_name}</p>
-                              <p className="mt-0.5 text-xs text-gray-400 break-words">
+                              <p className="break-words text-base text-slate-600">{exp.company_name}</p>
+                              <p className="mt-1 text-sm text-slate-400 break-words">
                                 {formatDate(exp.date_from)} – {formatDate(exp.date_to)}
                                 {exp.duration_months ? ` · ${formatDuration(exp.duration_months)}` : ''}
                                 {exp.location ? ` · ${exp.location}` : ''}
                               </p>
                               {exp.description && (
-                                <p className="mt-1 text-sm leading-relaxed text-gray-500 whitespace-pre-wrap break-words">
+                                <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-slate-500">
                                   {exp.description}
                                 </p>
                               )}
@@ -359,12 +387,12 @@ export default function ProfileDetailModal() {
 
                   {profile.educations && profile.educations.length > 0 && (
                     <section>
-                      <h3 className="mb-4 flex items-center gap-2 border-b pb-2 text-lg font-semibold text-gray-800">
+                      <h3 className="mb-5 flex items-center gap-2 border-b border-slate-200 pb-3 text-xl font-semibold text-slate-800">
                         🎓 Education
                       </h3>
-                      <div className="space-y-4">
+                      <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                         {profile.educations.map((edu, i) => (
-                          <div key={edu.id ?? i} className="flex gap-3">
+                          <div key={edu.id ?? i} className="flex gap-4 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
                             {edu.institution_logo_url ? (
                               <img
                                 src={edu.institution_logo_url}
@@ -377,10 +405,10 @@ export default function ProfileDetailModal() {
                               </div>
                             )}
                             <div className="min-w-0">
-                              <p className="font-semibold text-gray-900 break-words">{edu.institution_name}</p>
-                              <p className="text-sm text-gray-600 break-words">{edu.degree}</p>
+                              <p className="break-words text-lg font-semibold text-slate-900">{edu.institution_name}</p>
+                              <p className="break-words text-base text-slate-600">{edu.degree}</p>
                               {(edu.date_from_year || edu.date_to_year) && (
-                                <p className="text-xs text-gray-400">
+                                <p className="text-sm text-slate-400">
                                   {edu.date_from_year} – {edu.date_to_year ?? 'Present'}
                                 </p>
                               )}
@@ -393,7 +421,7 @@ export default function ProfileDetailModal() {
 
                   {dynamicSections.map((section) => (
                     <section key={section.key}>
-                      <h3 className="mb-4 flex items-center gap-2 border-b pb-2 text-lg font-semibold text-gray-800">
+                      <h3 className="mb-5 flex items-center gap-2 border-b border-slate-200 pb-3 text-xl font-semibold text-slate-800">
                         <span>{section.icon}</span>
                         <span>{section.title}</span>
                       </h3>
@@ -406,15 +434,15 @@ export default function ProfileDetailModal() {
 
                 <div className="space-y-6 xl:col-span-4">
                   {profile.skills && profile.skills.length > 0 && (
-                    <section>
-                      <h3 className="mb-4 border-b pb-2 text-lg font-semibold text-gray-800">
+                    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <h3 className="mb-5 border-b border-slate-200 pb-3 text-xl font-semibold text-slate-800">
                         🛠 Skills
                       </h3>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2.5">
                         {profile.skills.map((s, i) => (
                           <span
                             key={i}
-                            className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700"
+                            className="rounded-full border border-blue-100 bg-blue-50 px-3.5 py-1.5 text-sm font-medium text-blue-700"
                           >
                             {s.skill_name}
                           </span>
