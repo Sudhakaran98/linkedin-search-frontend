@@ -7,6 +7,7 @@ RUN npm ci
 
 COPY public ./public
 COPY src ./src
+COPY .babelrc ./
 COPY tsconfig.json ./
 COPY webpack.config.js ./
 RUN npm run build
