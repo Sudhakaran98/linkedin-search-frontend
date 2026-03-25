@@ -39,11 +39,11 @@ module.exports = (env, argv) => {
       port: 3000,
       historyApiFallback: true,
       hot: true,
-      // Proxy all /api requests to the backend running on port 8080
+      // Proxy all /api requests to the backend
       proxy: [
         {
           context: ['/api'],
-          target: process.env.API_URL || 'http://localhost:8080',
+          target: process.env.API_URL || 'http://localhost:9001',
           changeOrigin: true,
         },
       ],

@@ -1,17 +1,17 @@
-/* Global resets — Tailwind CDN handles most utilities */
+/* Global resets - Tailwind CDN handles most utilities */
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #f9fafb;
+  font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background-color: #eef4f7;
   color: #111827;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Utility for clamping text to 2 lines */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -19,6 +19,19 @@ body {
   overflow: hidden;
 }
 
-/* Hide scrollbar for subset row */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.rm-spinner {
+  display: inline-block;
+  border-style: solid;
+  border-radius: 9999px;
+  animation: rm-spin 0.75s linear infinite;
+}
+
+@keyframes rm-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}

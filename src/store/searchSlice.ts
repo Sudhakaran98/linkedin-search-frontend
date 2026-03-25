@@ -1,29 +1,33 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 export interface SearchState {
-  /** Live input values (controlled inputs) */
   skillsInput: string;
   designationInput: string;
-  /** Values actually submitted – used as query keys */
+  selectedLocations: string[];
+  minExperienceInput: string;
+  maxExperienceInput: string;
   submittedSkills: string;
   submittedDesignation: string;
-  /** Whether a search has been submitted at least once */
+  submittedLocations: string[];
+  submittedMinExperience: string;
+  submittedMaxExperience: string;
   hasSearched: boolean;
-  /** Currently selected 1 000-profile subset (0-indexed) */
-  activeSubset: number;
-  /** Current page within the active subset */
   currentPage: number;
-  /** Profile ID whose detail modal is open (null = closed) */
   selectedProfileId: string | null;
 }
 
 const initialState: SearchState = {
   skillsInput: '',
   designationInput: '',
+  selectedLocations: [],
+  minExperienceInput: '',
+  maxExperienceInput: '',
   submittedSkills: '',
   submittedDesignation: '',
+  submittedLocations: [],
+  submittedMinExperience: '',
+  submittedMaxExperience: '',
   hasSearched: false,
-  activeSubset: 0,
   currentPage: 1,
   selectedProfileId: null,
 };
@@ -38,17 +42,50 @@ const searchSlice = createSlice({
     setDesignationInput(state, action: PayloadAction<string>) {
       state.designationInput = action.payload;
     },
-    /** Commit the input values and reset pagination */
-    submitSearch(state) {
-      state.submittedSkills      = state.skillsInput;
-      state.submittedDesignation = state.designationInput;
-      state.hasSearched          = true;
-      state.activeSubset         = 0;
-      state.currentPage          = 1;
+    addLocation(state, action: PayloadAction<string>) {
+      if (!state.selectedLocations.includes(action.payload)) {
+        state.selectedLocations.push(action.payload);
+      }
     },
-    setActiveSubset(state, action: PayloadAction<number>) {
-      state.activeSubset = action.payload;
-      state.currentPage  = 1;           // reset to page 1 when switching subset
+    removeLocation(state, action: PayloadAction<string>) {
+      state.selectedLocations = state.selectedLocations.filter(
+        (location) => location !== action.payload
+      );
+    },
+    clearLocations(state) {
+      state.selectedLocations = [];
+    },
+    setSelectedLocations(state, action: PayloadAction<string[]>) {
+      state.selectedLocations = [...action.payload];
+    },
+    setMinExperienceInput(state, action: PayloadAction<string>) {
+      state.minExperienceInput = action.payload;
+    },
+    setMaxExperienceInput(state, action: PayloadAction<string>) {
+      state.maxExperienceInput = action.payload;
+    },
+    submitSearch(state) {
+      state.submittedSkills = state.skillsInput.trim();
+      state.submittedDesignation = state.designationInput.trim();
+      state.submittedLocations = [...state.selectedLocations];
+      state.submittedMinExperience = state.minExperienceInput.trim();
+      state.submittedMaxExperience = state.maxExperienceInput.trim();
+      state.hasSearched = true;
+      state.currentPage = 1;
+    },
+    clearSearch(state) {
+      state.skillsInput = '';
+      state.designationInput = '';
+      state.selectedLocations = [];
+      state.minExperienceInput = '';
+      state.maxExperienceInput = '';
+      state.submittedSkills = '';
+      state.submittedDesignation = '';
+      state.submittedLocations = [];
+      state.submittedMinExperience = '';
+      state.submittedMaxExperience = '';
+      state.hasSearched = false;
+      state.currentPage = 1;
     },
     setCurrentPage(state, action: PayloadAction<number>) {
       state.currentPage = action.payload;
@@ -65,8 +102,14 @@ const searchSlice = createSlice({
 export const {
   setSkillsInput,
   setDesignationInput,
+  addLocation,
+  removeLocation,
+  clearLocations,
+  setSelectedLocations,
+  setMinExperienceInput,
+  setMaxExperienceInput,
   submitSearch,
-  setActiveSubset,
+  clearSearch,
   setCurrentPage,
   openProfile,
   closeProfile,

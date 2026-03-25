@@ -1,14 +1,20 @@
-import React, { FormEvent } from 'react';
+import React, { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
-  setSkillsInput,
-  setDesignationInput,
-  submitSearch,
-  setActiveSubset,
+  addLocation,
+  clearLocations,
+  clearSearch,
+  removeLocation,
   setCurrentPage,
+  setDesignationInput,
+  setMaxExperienceInput,
+  setMinExperienceInput,
+  setSelectedLocations,
+  setSkillsInput,
+  submitSearch,
 } from '../store/searchSlice';
 import {
-  useGetSearchCountQuery,
+  useLazyGetLocationsQuery,
   useSearchProfilesQuery,
 } from '../store/searchApi';
 import ProfileCard from '../components/ProfileCard';
@@ -16,228 +22,552 @@ import ProfileDetailModal from '../components/ProfileDetailModal';
 
 export default function Home() {
   const dispatch = useAppDispatch();
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const firstLocationLoadRef = useRef(true);
+  const toastTimerRef = useRef<number | null>(null);
 
-  // ── Input state from Redux ──────────────────────────────────────────────────
-  const skillsInput      = useAppSelector((s) => s.search.skillsInput);
+  const skillsInput = useAppSelector((s) => s.search.skillsInput);
   const designationInput = useAppSelector((s) => s.search.designationInput);
-  const hasSearched      = useAppSelector((s) => s.search.hasSearched);
-  const submittedSkills  = useAppSelector((s) => s.search.submittedSkills);
-  const submittedDesig   = useAppSelector((s) => s.search.submittedDesignation);
-  const activeSubset     = useAppSelector((s) => s.search.activeSubset);
-  const currentPage      = useAppSelector((s) => s.search.currentPage);
+  const selectedLocations = useAppSelector((s) => s.search.selectedLocations);
+  const minExperienceInput = useAppSelector((s) => s.search.minExperienceInput);
+  const maxExperienceInput = useAppSelector((s) => s.search.maxExperienceInput);
+  const submittedSkills = useAppSelector((s) => s.search.submittedSkills);
+  const submittedDesignation = useAppSelector((s) => s.search.submittedDesignation);
+  const submittedLocations = useAppSelector((s) => s.search.submittedLocations);
+  const submittedMinExperience = useAppSelector((s) => s.search.submittedMinExperience);
+  const submittedMaxExperience = useAppSelector((s) => s.search.submittedMaxExperience);
+  const hasSearched = useAppSelector((s) => s.search.hasSearched);
+  const currentPage = useAppSelector((s) => s.search.currentPage);
 
-  // ── RTK Query: count ────────────────────────────────────────────────────────
-  const {
-    data: countData,
-    isFetching: countFetching,
-    isError: countError,
-  } = useGetSearchCountQuery(
-    { skills: submittedSkills, designation: submittedDesig },
-    { skip: !hasSearched }
-  );
+  const [locationSearch, setLocationSearch] = useState('');
+  const [isLocationOpen, setIsLocationOpen] = useState(false);
+  const [locationOptions, setLocationOptions] = useState<string[]>([]);
+  const [locationPage, setLocationPage] = useState(1);
+  const [locationTotalPages, setLocationTotalPages] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [toast, setToast] = useState<{
+    message: string;
+    tone: 'info' | 'error';
+  } | null>(null);
 
-  // ── RTK Query: profiles ─────────────────────────────────────────────────────
+  const [triggerLocations, { isFetching: locationsFetching }] = useLazyGetLocationsQuery();
+
   const {
-    data: profilesData,
+    currentData: profilesData,
     isFetching: profilesFetching,
     isError: profilesError,
   } = useSearchProfilesQuery(
     {
-      skills:      submittedSkills,
-      designation: submittedDesig,
-      subset:      activeSubset,
-      page:        currentPage,
+      skills: submittedSkills || undefined,
+      designation: submittedDesignation || undefined,
+      location: submittedLocations.length > 0 ? submittedLocations : undefined,
+      min_experience: submittedMinExperience ? Number(submittedMinExperience) : undefined,
+      max_experience: submittedMaxExperience ? Number(submittedMaxExperience) : undefined,
+      page: currentPage,
     },
-    { skip: !hasSearched || !countData }
+    { skip: !hasSearched }
   );
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!skillsInput.trim() && !designationInput.trim()) return;
+  const isSearching = hasSearched && profilesFetching;
+
+  const activeFilterSummary = useMemo(
+    () =>
+      [
+        submittedSkills,
+        submittedDesignation,
+        submittedLocations.length > 0 ? submittedLocations.join(', ') : '',
+        submittedMinExperience || submittedMaxExperience
+          ? `${submittedMinExperience || '0'}-${submittedMaxExperience || 'Any'} years experience`
+          : '',
+      ].filter(Boolean),
+    [
+      submittedSkills,
+      submittedDesignation,
+      submittedLocations,
+      submittedMinExperience,
+      submittedMaxExperience,
+    ]
+  );
+
+  const locationSummary = useMemo(() => {
+    if (selectedLocations.length === 0) {
+      return '';
+    }
+
+    if (selectedLocations.length === 1) {
+      return selectedLocations[0];
+    }
+
+    return `${selectedLocations.length} locations selected`;
+  }, [selectedLocations]);
+
+  const allVisibleLocationsSelected =
+    locationOptions.length > 0 &&
+    locationOptions.every((location) => selectedLocations.includes(location));
+
+  function showToast(message: string, tone: 'info' | 'error' = 'info') {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+
+    setToast({ message, tone });
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 4500);
+  }
+
+  async function loadLocations(page: number, search: string, replace: boolean) {
+    try {
+      const response = await triggerLocations({ page, search }).unwrap();
+      setLocationPage(response.page);
+      setLocationTotalPages(response.totalPages);
+      setLocationOptions((prev) => {
+        const next = replace ? response.locations : [...prev, ...response.locations];
+        return Array.from(new Set(next));
+      });
+    } catch {
+      if (replace) {
+        setLocationOptions([]);
+        setLocationPage(1);
+        setLocationTotalPages(0);
+      }
+    }
+  }
+
+  useEffect(() => {
+    loadLocations(1, '', true);
+  }, []);
+
+  useEffect(() => {
+    if (firstLocationLoadRef.current) {
+      firstLocationLoadRef.current = false;
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      loadLocations(1, locationSearch, true);
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [locationSearch]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsLocationOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!hasSearched) {
+      return;
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage, hasSearched]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
     dispatch(submitSearch());
   }
 
-  function handleSubsetClick(idx: number) {
-    dispatch(setActiveSubset(idx));
-    window.scrollTo({ top: 350, behavior: 'smooth' });
+  function handleClear() {
+    dispatch(clearSearch());
+    dispatch(clearLocations());
+    setLocationSearch('');
+    setIsLocationOpen(false);
+    loadLocations(1, '', true);
   }
 
+  function handleLocationScroll(event: React.UIEvent<HTMLDivElement>) {
+    const element = event.currentTarget;
+    const nearBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 16;
+
+    if (nearBottom && !locationsFetching && locationPage < locationTotalPages) {
+      loadLocations(locationPage + 1, locationSearch, false);
+    }
+  }
+
+  async function handleDownload() {
+    try {
+      setIsDownloading(true);
+      showToast(
+        'Export is being prepared. Large downloads may take a moment.',
+        'info'
+      );
+
+      const response = await fetch('/api/search/profiles/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          skills: submittedSkills || undefined,
+          designation: submittedDesignation || undefined,
+          location: submittedLocations,
+          min_experience: submittedMinExperience ? Number(submittedMinExperience) : undefined,
+          max_experience: submittedMaxExperience ? Number(submittedMaxExperience) : undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Export failed. Please try again.';
+        try {
+          const errorBody = await response.json();
+          if (typeof errorBody?.error === 'string' && errorBody.error.trim()) {
+            errorMessage = errorBody.error;
+          }
+        } catch {
+          // Ignore JSON parsing issues and fall back to the generic error message.
+        }
+        throw new Error(errorMessage);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'profiles-export.csv';
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+      showToast('Export is ready and the CSV download should start shortly.', 'info');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Export failed. Please try again.';
+      showToast(message, 'error');
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  const resultCount = profilesData?.total ?? 0;
   const totalPages = profilesData?.totalPages ?? 0;
-  const hasResults = !!countData && countData.total > 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f3f8ff_0%,#eef7fb_50%,#f9fcff_100%)] text-slate-900">
+      {toast && (
+        <div className="fixed right-4 top-4 z-[100] max-w-md">
+          <div
+            className={[
+              'rounded-2xl border px-4 py-3 shadow-[0_16px_40px_rgba(15,82,143,0.18)] backdrop-blur',
+              toast.tone === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-800'
+                : 'border-cyan-100 bg-white/95 text-slate-800',
+            ].join(' ')}
+            role="status"
+            aria-live="polite"
+          >
+            <p className="text-sm font-medium leading-6">{toast.message}</p>
+          </div>
+        </div>
+      )}
 
-      {/* ── Header / Search ───────────────────────────────────────────── */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-blue-700 mb-1">LinkedIn Profile Search</h1>
-          <p className="text-gray-500 text-sm mb-5">
-            Search millions of profiles by skills or designation using full-text ranking.
+      <header className="relative z-20 border-b border-cyan-100/80 bg-[linear-gradient(90deg,rgba(64,128,255,0.08)_0%,rgba(32,201,151,0.08)_100%)] backdrop-blur">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+            LinkedIn Profile Search
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+            Search ranked profiles from OpenSearch and refine the list with boolean
+            skills, designation, multi-location filters, and min/max experience.
           </p>
 
-          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
-            {/* Skills box (wider) */}
-            <input
-              type="text"
-              placeholder="Skills  (e.g. java, spring, sql)"
-              value={skillsInput}
-              onChange={(e) => dispatch(setSkillsInput(e.target.value))}
-              className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400"
-            />
+          <form
+            onSubmit={handleSubmit}
+            className="relative z-30 mt-6 overflow-visible rounded-[28px] border border-cyan-100/80 bg-white/90 p-4 shadow-[0_18px_60px_rgba(15,82,143,0.08)] sm:p-5"
+          >
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-10">
+              <input
+                type="text"
+                placeholder='Skills, e.g. java and spring not "full stack"'
+                value={skillsInput}
+                onChange={(event) => dispatch(setSkillsInput(event.target.value))}
+                className="h-[52px] rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 lg:col-span-5"
+              />
 
-            {/* Designation box */}
-            <input
-              type="text"
-              placeholder="Designation  (e.g. Software Engineer)"
-              value={designationInput}
-              onChange={(e) => dispatch(setDesignationInput(e.target.value))}
-              className="sm:w-64 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400"
-            />
+              <input
+                type="text"
+                placeholder="Designation"
+                value={designationInput}
+                onChange={(event) => dispatch(setDesignationInput(event.target.value))}
+                className="h-[52px] rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 lg:col-span-5"
+              />
 
-            <button
-              type="submit"
-              disabled={countFetching || (!skillsInput.trim() && !designationInput.trim())}
-              className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {countFetching ? 'Searching…' : 'Search'}
-            </button>
+              <div className="relative lg:col-span-4" ref={dropdownRef}>
+                <div className="flex h-[52px] items-center rounded-2xl border border-slate-300 bg-white px-4 transition focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                  <input
+                    type="text"
+                    placeholder={locationSummary || 'Locations'}
+                    value={locationSearch}
+                    onFocus={() => setIsLocationOpen(true)}
+                    onChange={(event) => {
+                      setLocationSearch(event.target.value);
+                      setIsLocationOpen(true);
+                    }}
+                    className="w-full border-none bg-transparent p-0 text-sm outline-none placeholder:text-slate-400"
+                  />
+
+                  {selectedLocations.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => dispatch(clearLocations())}
+                      className="ml-3 shrink-0 text-xs font-semibold text-cyan-700 transition hover:text-cyan-800"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {isLocationOpen && (
+                  <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[80] overflow-hidden rounded-2xl border border-cyan-100 bg-white shadow-[0_24px_60px_rgba(15,82,143,0.18)]">
+                    <div className="border-b border-slate-100 px-4 py-3">
+                      <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={allVisibleLocationsSelected}
+                          onChange={(event) => {
+                            if (event.target.checked) {
+                              dispatch(
+                                setSelectedLocations(
+                                  Array.from(new Set([...selectedLocations, ...locationOptions]))
+                                )
+                              );
+                            } else {
+                              dispatch(
+                                setSelectedLocations(
+                                  selectedLocations.filter(
+                                    (location) => !locationOptions.includes(location)
+                                  )
+                                )
+                              );
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                        />
+                        <span>Select all</span>
+                      </label>
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto py-2" onScroll={handleLocationScroll}>
+                      {locationOptions.length === 0 && !locationsFetching && (
+                        <div className="px-4 py-3 text-sm text-slate-500">
+                          No locations found.
+                        </div>
+                      )}
+
+                      {locationOptions.map((location) => {
+                        const isSelected = selectedLocations.includes(location);
+
+                        return (
+                          <label
+                            key={location}
+                            className="flex cursor-pointer items-center gap-3 px-4 py-3 text-sm text-slate-700 transition hover:bg-slate-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(event) => {
+                                if (event.target.checked) {
+                                  dispatch(addLocation(location));
+                                } else {
+                                  dispatch(removeLocation(location));
+                                }
+                              }}
+                              className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                            />
+                            <span className="truncate">{location}</span>
+                          </label>
+                        );
+                      })}
+
+                      {locationsFetching && (
+                        <div className="px-4 py-3 text-sm text-slate-400">
+                          Loading locations...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <input
+                type="number"
+                min="0"
+                placeholder="Min exp."
+                value={minExperienceInput}
+                onChange={(event) => dispatch(setMinExperienceInput(event.target.value))}
+                className="h-[52px] rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 lg:col-span-2"
+              />
+
+              <input
+                type="number"
+                min="0"
+                placeholder="Max exp."
+                value={maxExperienceInput}
+                onChange={(event) => dispatch(setMaxExperienceInput(event.target.value))}
+                className="h-[52px] rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 lg:col-span-2"
+              />
+
+              <button
+                type="submit"
+                disabled={isSearching}
+                className="inline-flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#4f7cff_0%,#1cc8a0_100%)] px-5 py-3 text-sm font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-75 lg:col-span-1"
+              >
+                {isSearching && <span className="rm-spinner h-4 w-4 border-white/35 border-t-white" />}
+                {isSearching ? 'Searching...' : 'Search'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClear}
+                className="inline-flex h-[52px] items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 lg:col-span-1"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-current">
+                  <path d="M9 3a1 1 0 000 2h6a1 1 0 100-2H9zm-3 4a1 1 0 000 2h.44l.74 10.36A2 2 0 009.17 21h5.66a2 2 0 001.99-1.64L17.56 9H18a1 1 0 100-2H6zm3.17 2h5.66l-.71 10H9.88l-.71-10z" />
+                </svg>
+                Clear
+              </button>
+            </div>
           </form>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
-
-        {/* ── Empty state ─────────────────────────────────────────────── */}
+      <main className="relative z-10 mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {!hasSearched && (
-          <div className="flex flex-col items-center justify-center py-24 text-center text-gray-400">
-            <div className="text-6xl mb-4">🔍</div>
-            <p className="text-lg font-medium text-gray-500">Enter skills or a designation to begin searching.</p>
-          </div>
-        )}
-
-        {/* ── Error ───────────────────────────────────────────────────── */}
-        {(countError || profilesError) && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-5 mb-6">
-            <strong>Search failed.</strong> Make sure the API server is running and reachable.
-          </div>
-        )}
-
-        {/* ── Results ─────────────────────────────────────────────────── */}
-        {hasSearched && countData && (
-          <div>
-
-            {/* Count summary */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
-              <p className="text-gray-800 font-semibold text-lg">
-                {countData.total.toLocaleString()} profiles found
-                {(submittedSkills || submittedDesig) && (
-                  <span className="font-normal text-gray-500 text-base">
-                    {' '}for "{[submittedSkills, submittedDesig].filter(Boolean).join(' · ')}"
-                  </span>
-                )}
+          <section className="rounded-[32px] border border-cyan-100/80 bg-white/80 px-8 py-16 text-center shadow-[0_18px_60px_rgba(15,82,143,0.08)] backdrop-blur">
+            <div className="mx-auto max-w-2xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-600">
+                Search Workspace
               </p>
-              {countData.subsets > 1 && (
-                <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                  {countData.subsets} subsets · {countData.subsetSize.toLocaleString()} profiles each
-                </span>
-              )}
+              <h2 className="mt-4 text-4xl font-semibold tracking-tight text-slate-900">
+                Build your shortlist with skills, designation, location, and experience.
+              </h2>
+              <p className="mt-4 text-base leading-7 text-slate-500">
+                Start with any combination of filters. LinkedIn profiles are
+                listed based on your search.
+              </p>
             </div>
+          </section>
+        )}
 
-            {/* Subset selector */}
-            {hasResults && countData.subsets > 1 && (
-              <div className="mb-6">
-                <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider mb-2">Select Subset</p>
-                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                  {Array.from({ length: countData.subsets }).map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleSubsetClick(i)}
-                      className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-all whitespace-nowrap
-                        ${activeSubset === i
-                          ? 'bg-blue-600 text-white border-blue-600 shadow'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
-                        }`}
-                    >
-                      Subset {i + 1}
-                      <span className="ml-1 text-xs opacity-70">
-                        ({(i * countData.subsetSize + 1).toLocaleString()}–{Math.min((i + 1) * countData.subsetSize, countData.total).toLocaleString()})
-                      </span>
-                    </button>
-                  ))}
+        {profilesError && (
+          <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+            Search failed. Please make sure the backend is running and reachable.
+          </div>
+        )}
+
+        {hasSearched && (
+          <section className="space-y-6">
+            {!isSearching && profilesData && (
+              <div className="grid gap-4 rounded-[28px] border border-cyan-100/80 bg-white px-5 py-5 shadow-[0_18px_60px_rgba(15,82,143,0.08)] lg:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="min-w-0 lg:pr-4">
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-600">
+                  Results
+                </p>
+                <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
+                  {resultCount.toLocaleString()} profiles found
+                </h2>
+                {activeFilterSummary.length > 0 && (
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Filters: {activeFilterSummary.join(' • ')}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex min-h-full flex-col justify-between gap-4 lg:items-end">
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={isDownloading || resultCount === 0}
+                  className="inline-flex items-center justify-center gap-2 self-start rounded-full bg-[linear-gradient(135deg,#4f7cff_0%,#1cc8a0_100%)] px-4 py-2 font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70 lg:self-end"
+                >
+                  {isDownloading && <span className="rm-spinner h-4 w-4 border-white/35 border-t-white" />}
+                  {isDownloading ? 'Downloading...' : 'Download CSV'}
+                </button>
+
+                <div className="flex flex-nowrap gap-2 text-sm text-slate-500 lg:justify-end">
+                  <span className="whitespace-nowrap rounded-full bg-slate-100 px-3 py-2">
+                    Page {profilesData.page}
+                  </span>
+                  <span className="whitespace-nowrap rounded-full bg-slate-100 px-3 py-2">
+                    Page Size {profilesData.pageSize}
+                  </span>
+                  <span className="whitespace-nowrap rounded-full bg-slate-100 px-3 py-2">
+                    Total Pages {totalPages}
+                  </span>
+                </div>
+              </div>
+              </div>
+            )}
+
+            {isSearching && (
+              <div className="flex min-h-[50vh] items-center justify-center rounded-[28px] border border-cyan-100/80 bg-white shadow-[0_18px_60px_rgba(15,82,143,0.08)]">
+                <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-5 py-3 text-slate-700 shadow-sm">
+                  <span className="rm-spinner h-5 w-5 border-slate-200 border-t-cyan-600" />
+                  <span className="text-sm font-semibold">Loading profiles...</span>
                 </div>
               </div>
             )}
 
-            {/* No results */}
-            {!hasResults && !countFetching && (
-              <div className="py-16 text-center text-gray-400">
-                <div className="text-5xl mb-3">😶</div>
-                <p className="text-lg">No profiles matched your search. Try broader terms.</p>
+            {profilesData && profilesData.profiles.length === 0 && !isSearching && (
+              <div className="rounded-[28px] border border-cyan-100/80 bg-white px-8 py-14 text-center shadow-sm">
+                <p className="text-2xl font-semibold text-slate-800">No profiles found</p>
+                <p className="mt-3 text-sm text-slate-500">
+                  Try broadening your skills, designation, location, or experience range.
+                </p>
               </div>
             )}
 
-            {/* Loading skeleton */}
-            {profilesFetching && !profilesData && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse">
-                    <div className="flex gap-3 mb-3">
-                      <div className="w-14 h-14 bg-gray-200 rounded-full" />
-                      <div className="flex-1 space-y-2 pt-1">
-                        <div className="h-4 bg-gray-200 rounded w-3/4" />
-                        <div className="h-3 bg-gray-200 rounded w-full" />
-                        <div className="h-3 bg-gray-200 rounded w-2/3" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-3 bg-gray-200 rounded w-5/6" />
-                      <div className="h-3 bg-gray-200 rounded w-1/2" />
-                    </div>
-                  </div>
+            {profilesData && profilesData.profiles.length > 0 && !isSearching && (
+              <div className="space-y-4">
+                {profilesData.profiles.map((profile) => (
+                  <ProfileCard key={profile.id} profile={profile} />
                 ))}
               </div>
             )}
 
-            {/* Profile cards grid */}
-            {profilesData && profilesData.profiles.length > 0 && (
-              <div className={`relative ${profilesFetching ? 'opacity-60 pointer-events-none' : ''} transition-opacity`}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {profilesData.profiles.map((profile) => (
-                    <ProfileCard key={profile.id} profile={profile} />
-                  ))}
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="mt-8 flex items-center justify-center gap-3">
-                    <button
-                      onClick={() => dispatch(setCurrentPage(Math.max(1, currentPage - 1)))}
-                      disabled={currentPage === 1 || profilesFetching}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      ← Previous
-                    </button>
-                    <span className="text-sm text-gray-600">
-                      Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
-                    </span>
-                    <button
-                      onClick={() => dispatch(setCurrentPage(Math.min(totalPages, currentPage + 1)))}
-                      disabled={currentPage === totalPages || profilesFetching}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Next →
-                    </button>
-                  </div>
-                )}
+            {profilesData && profilesData.profiles.length > 0 && totalPages > 1 && !isSearching && (
+              <div className="flex flex-col items-center justify-between gap-4 rounded-[24px] border border-cyan-100/80 bg-white px-5 py-4 shadow-sm sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => dispatch(setCurrentPage(Math.max(1, currentPage - 1)))}
+                  disabled={currentPage === 1 || profilesFetching}
+                  className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <p className="text-sm text-slate-500">
+                  Page <span className="font-semibold text-slate-800">{currentPage}</span> of{' '}
+                  <span className="font-semibold text-slate-800">{totalPages}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    dispatch(setCurrentPage(Math.min(totalPages, currentPage + 1)))
+                  }
+                  disabled={currentPage === totalPages || profilesFetching}
+                  className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
               </div>
             )}
-          </div>
+          </section>
         )}
       </main>
 
-      {/* Profile detail modal — rendered at root level */}
       <ProfileDetailModal />
     </div>
   );
