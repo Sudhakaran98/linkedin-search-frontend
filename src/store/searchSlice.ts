@@ -6,11 +6,13 @@ export interface SearchState {
   selectedLocations: string[];
   minExperienceInput: string;
   maxExperienceInput: string;
+  femaleCandidate: boolean;
   submittedSkills: string;
   submittedDesignation: string;
   submittedLocations: string[];
   submittedMinExperience: string;
   submittedMaxExperience: string;
+  submittedFemaleCandidate: boolean;
   hasSearched: boolean;
   currentPage: number;
   selectedProfileId: string | null;
@@ -22,11 +24,13 @@ const initialState: SearchState = {
   selectedLocations: [],
   minExperienceInput: '',
   maxExperienceInput: '',
+  femaleCandidate: false,
   submittedSkills: '',
   submittedDesignation: '',
   submittedLocations: [],
   submittedMinExperience: '',
   submittedMaxExperience: '',
+  submittedFemaleCandidate: false,
   hasSearched: false,
   currentPage: 1,
   selectedProfileId: null,
@@ -64,12 +68,16 @@ const searchSlice = createSlice({
     setMaxExperienceInput(state, action: PayloadAction<string>) {
       state.maxExperienceInput = action.payload;
     },
+    setFemaleCandidate(state, action: PayloadAction<boolean>) {
+      state.femaleCandidate = action.payload;
+    },
     submitSearch(state) {
       state.submittedSkills = state.skillsInput.trim();
       state.submittedDesignation = state.designationInput.trim();
       state.submittedLocations = [...state.selectedLocations];
       state.submittedMinExperience = state.minExperienceInput.trim();
       state.submittedMaxExperience = state.maxExperienceInput.trim();
+      state.submittedFemaleCandidate = state.femaleCandidate;
       state.hasSearched = true;
       state.currentPage = 1;
     },
@@ -79,11 +87,13 @@ const searchSlice = createSlice({
       state.selectedLocations = [];
       state.minExperienceInput = '';
       state.maxExperienceInput = '';
+      state.femaleCandidate = false;
       state.submittedSkills = '';
       state.submittedDesignation = '';
       state.submittedLocations = [];
       state.submittedMinExperience = '';
       state.submittedMaxExperience = '';
+      state.submittedFemaleCandidate = false;
       state.hasSearched = false;
       state.currentPage = 1;
     },
@@ -108,6 +118,7 @@ export const {
   setSelectedLocations,
   setMinExperienceInput,
   setMaxExperienceInput,
+  setFemaleCandidate,
   submitSearch,
   clearSearch,
   setCurrentPage,

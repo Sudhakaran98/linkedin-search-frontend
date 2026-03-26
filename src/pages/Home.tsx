@@ -6,6 +6,7 @@ import {
   clearSearch,
   removeLocation,
   setCurrentPage,
+  setFemaleCandidate,
   setDesignationInput,
   setMaxExperienceInput,
   setMinExperienceInput,
@@ -31,11 +32,13 @@ export default function Home() {
   const selectedLocations = useAppSelector((s) => s.search.selectedLocations);
   const minExperienceInput = useAppSelector((s) => s.search.minExperienceInput);
   const maxExperienceInput = useAppSelector((s) => s.search.maxExperienceInput);
+  const femaleCandidate = useAppSelector((s) => s.search.femaleCandidate);
   const submittedSkills = useAppSelector((s) => s.search.submittedSkills);
   const submittedDesignation = useAppSelector((s) => s.search.submittedDesignation);
   const submittedLocations = useAppSelector((s) => s.search.submittedLocations);
   const submittedMinExperience = useAppSelector((s) => s.search.submittedMinExperience);
   const submittedMaxExperience = useAppSelector((s) => s.search.submittedMaxExperience);
+  const submittedFemaleCandidate = useAppSelector((s) => s.search.submittedFemaleCandidate);
   const hasSearched = useAppSelector((s) => s.search.hasSearched);
   const currentPage = useAppSelector((s) => s.search.currentPage);
 
@@ -60,6 +63,7 @@ export default function Home() {
     {
       skills: submittedSkills || undefined,
       designation: submittedDesignation || undefined,
+      female_candidate: submittedFemaleCandidate || undefined,
       location: submittedLocations.length > 0 ? submittedLocations : undefined,
       min_experience: submittedMinExperience ? Number(submittedMinExperience) : undefined,
       max_experience: submittedMaxExperience ? Number(submittedMaxExperience) : undefined,
@@ -75,6 +79,7 @@ export default function Home() {
       [
         submittedSkills,
         submittedDesignation,
+        submittedFemaleCandidate ? 'Female candidates only' : '',
         submittedLocations.length > 0 ? submittedLocations.join(', ') : '',
         submittedMinExperience || submittedMaxExperience
           ? `${submittedMinExperience || '0'}-${submittedMaxExperience || 'Any'} years experience`
@@ -83,6 +88,7 @@ export default function Home() {
     [
       submittedSkills,
       submittedDesignation,
+      submittedFemaleCandidate,
       submittedLocations,
       submittedMinExperience,
       submittedMaxExperience,
@@ -217,6 +223,7 @@ export default function Home() {
         body: JSON.stringify({
           skills: submittedSkills || undefined,
           designation: submittedDesignation || undefined,
+          female_candidate: submittedFemaleCandidate || undefined,
           location: submittedLocations,
           min_experience: submittedMinExperience ? Number(submittedMinExperience) : undefined,
           max_experience: submittedMaxExperience ? Number(submittedMaxExperience) : undefined,
@@ -288,13 +295,13 @@ export default function Home() {
             onSubmit={handleSubmit}
             className="relative z-30 mt-6 overflow-visible rounded-[28px] border border-cyan-100/80 bg-white/90 p-4 shadow-[0_18px_60px_rgba(15,82,143,0.08)] sm:p-5"
           >
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-10">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
               <input
                 type="text"
                 placeholder='Skills, e.g. java and spring not "full stack"'
                 value={skillsInput}
                 onChange={(event) => dispatch(setSkillsInput(event.target.value))}
-                className="h-[52px] rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 lg:col-span-5"
+                className="h-[52px] rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 lg:col-span-7"
               />
 
               <input
@@ -305,141 +312,157 @@ export default function Home() {
                 className="h-[52px] rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 lg:col-span-5"
               />
 
-              <div className="relative lg:col-span-4" ref={dropdownRef}>
-                <div className="flex h-[52px] items-center rounded-2xl border border-slate-300 bg-white px-4 transition focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
-                  <input
-                    type="text"
-                    placeholder={locationSummary || 'Locations'}
-                    value={locationSearch}
-                    onFocus={() => setIsLocationOpen(true)}
-                    onChange={(event) => {
-                      setLocationSearch(event.target.value);
-                      setIsLocationOpen(true);
-                    }}
-                    className="w-full border-none bg-transparent p-0 text-sm outline-none placeholder:text-slate-400"
-                  />
+              <div className="flex flex-col gap-3 lg:col-span-12 lg:flex-row lg:flex-wrap lg:items-center">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative lg:w-[280px] lg:flex-[0_0_280px]" ref={dropdownRef}>
+                    <div className="flex h-[52px] items-center rounded-2xl border border-slate-300 bg-white px-4 transition focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                      <input
+                        type="text"
+                        placeholder={locationSummary || 'Locations'}
+                        value={locationSearch}
+                        onFocus={() => setIsLocationOpen(true)}
+                        onChange={(event) => {
+                          setLocationSearch(event.target.value);
+                          setIsLocationOpen(true);
+                        }}
+                        className="w-full border-none bg-transparent p-0 text-sm outline-none placeholder:text-slate-400"
+                      />
 
-                  {selectedLocations.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => dispatch(clearLocations())}
-                      className="ml-3 shrink-0 text-xs font-semibold text-cyan-700 transition hover:text-cyan-800"
-                    >
-                      Clear
-                    </button>
+                      {selectedLocations.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => dispatch(clearLocations())}
+                          className="ml-3 shrink-0 text-xs font-semibold text-cyan-700 transition hover:text-cyan-800"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    {isLocationOpen && (
+                      <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[80] overflow-hidden rounded-2xl border border-cyan-100 bg-white shadow-[0_24px_60px_rgba(15,82,143,0.18)]">
+                      <div className="border-b border-slate-100 px-4 py-3">
+                        <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={allVisibleLocationsSelected}
+                            onChange={(event) => {
+                              if (event.target.checked) {
+                                dispatch(
+                                  setSelectedLocations(
+                                    Array.from(new Set([...selectedLocations, ...locationOptions]))
+                                  )
+                                );
+                              } else {
+                                dispatch(
+                                  setSelectedLocations(
+                                    selectedLocations.filter(
+                                      (location) => !locationOptions.includes(location)
+                                    )
+                                  )
+                                );
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                          />
+                          <span>Select all</span>
+                        </label>
+                      </div>
+
+                      <div className="max-h-72 overflow-y-auto py-2" onScroll={handleLocationScroll}>
+                        {locationOptions.length === 0 && !locationsFetching && (
+                          <div className="px-4 py-3 text-sm text-slate-500">
+                            No locations found.
+                          </div>
+                        )}
+
+                        {locationOptions.map((location) => {
+                          const isSelected = selectedLocations.includes(location);
+
+                          return (
+                            <label
+                              key={location}
+                              className="flex cursor-pointer items-center gap-3 px-4 py-3 text-sm text-slate-700 transition hover:bg-slate-50"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(event) => {
+                                  if (event.target.checked) {
+                                    dispatch(addLocation(location));
+                                  } else {
+                                    dispatch(removeLocation(location));
+                                  }
+                                }}
+                                className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                              />
+                              <span className="truncate">{location}</span>
+                            </label>
+                          );
+                        })}
+
+                        {locationsFetching && (
+                          <div className="px-4 py-3 text-sm text-slate-400">
+                            Loading locations...
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                {isLocationOpen && (
-                  <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[80] overflow-hidden rounded-2xl border border-cyan-100 bg-white shadow-[0_24px_60px_rgba(15,82,143,0.18)]">
-                    <div className="border-b border-slate-100 px-4 py-3">
-                      <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={allVisibleLocationsSelected}
-                          onChange={(event) => {
-                            if (event.target.checked) {
-                              dispatch(
-                                setSelectedLocations(
-                                  Array.from(new Set([...selectedLocations, ...locationOptions]))
-                                )
-                              );
-                            } else {
-                              dispatch(
-                                setSelectedLocations(
-                                  selectedLocations.filter(
-                                    (location) => !locationOptions.includes(location)
-                                  )
-                                )
-                              );
-                            }
-                          }}
-                          className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
-                        />
-                        <span>Select all</span>
-                      </label>
-                    </div>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Min exp."
+                  value={minExperienceInput}
+                  onChange={(event) => dispatch(setMinExperienceInput(event.target.value))}
+                  className="h-[52px] rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 lg:w-[140px] lg:flex-[0_0_140px]"
+                />
 
-                    <div className="max-h-72 overflow-y-auto py-2" onScroll={handleLocationScroll}>
-                      {locationOptions.length === 0 && !locationsFetching && (
-                        <div className="px-4 py-3 text-sm text-slate-500">
-                          No locations found.
-                        </div>
-                      )}
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Max exp."
+                  value={maxExperienceInput}
+                  onChange={(event) => dispatch(setMaxExperienceInput(event.target.value))}
+                  className="h-[52px] rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 lg:w-[140px] lg:flex-[0_0_140px]"
+                />
 
-                      {locationOptions.map((location) => {
-                        const isSelected = selectedLocations.includes(location);
-
-                        return (
-                          <label
-                            key={location}
-                            className="flex cursor-pointer items-center gap-3 px-4 py-3 text-sm text-slate-700 transition hover:bg-slate-50"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={(event) => {
-                                if (event.target.checked) {
-                                  dispatch(addLocation(location));
-                                } else {
-                                  dispatch(removeLocation(location));
-                                }
-                              }}
-                              className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
-                            />
-                            <span className="truncate">{location}</span>
-                          </label>
-                        );
-                      })}
-
-                      {locationsFetching && (
-                        <div className="px-4 py-3 text-sm text-slate-400">
-                          Loading locations...
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                <label className="flex h-[52px] items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-slate-700 lg:w-[180px] lg:flex-[0_0_180px]">
+                  <input
+                    type="checkbox"
+                    checked={femaleCandidate}
+                    onChange={(event) => dispatch(setFemaleCandidate(event.target.checked))}
+                    className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                  />
+                  <span>Female Candidate</span>
+                </label>
               </div>
 
-              <input
-                type="number"
-                min="0"
-                placeholder="Min exp."
-                value={minExperienceInput}
-                onChange={(event) => dispatch(setMinExperienceInput(event.target.value))}
-                className="h-[52px] rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 lg:col-span-2"
-              />
+              <div className="flex gap-2 lg:ml-auto">
+                <button
+                  type="submit"
+                  disabled={isSearching}
+                  className="inline-flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#4f7cff_0%,#1cc8a0_100%)] px-5 py-3 text-sm font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-75 lg:w-[120px] lg:flex-[0_0_120px]"
+                >
+                  {isSearching && <span className="rm-spinner h-4 w-4 border-white/35 border-t-white" />}
+                  {isSearching ? 'Searching...' : 'Search'}
+                </button>
 
-              <input
-                type="number"
-                min="0"
-                placeholder="Max exp."
-                value={maxExperienceInput}
-                onChange={(event) => dispatch(setMaxExperienceInput(event.target.value))}
-                className="h-[52px] rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 lg:col-span-2"
-              />
-
-              <button
-                type="submit"
-                disabled={isSearching}
-                className="inline-flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#4f7cff_0%,#1cc8a0_100%)] px-5 py-3 text-sm font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-75 lg:col-span-1"
-              >
-                {isSearching && <span className="rm-spinner h-4 w-4 border-white/35 border-t-white" />}
-                {isSearching ? 'Searching...' : 'Search'}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleClear}
-                className="inline-flex h-[52px] items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 lg:col-span-1"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-current">
-                  <path d="M9 3a1 1 0 000 2h6a1 1 0 100-2H9zm-3 4a1 1 0 000 2h.44l.74 10.36A2 2 0 009.17 21h5.66a2 2 0 001.99-1.64L17.56 9H18a1 1 0 100-2H6zm3.17 2h5.66l-.71 10H9.88l-.71-10z" />
-                </svg>
-                Clear
-              </button>
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="inline-flex h-[52px] items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 lg:w-[120px] lg:flex-[0_0_120px]"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-current">
+                    <path d="M9 3a1 1 0 000 2h6a1 1 0 100-2H9zm-3 4a1 1 0 000 2h.44l.74 10.36A2 2 0 009.17 21h5.66a2 2 0 001.99-1.64L17.56 9H18a1 1 0 100-2H6zm3.17 2h5.66l-.71 10H9.88l-.71-10z" />
+                  </svg>
+                  Clear
+                </button>
+              </div>
             </div>
+          </div>
           </form>
         </div>
       </header>

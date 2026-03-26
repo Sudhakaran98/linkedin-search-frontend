@@ -26,6 +26,7 @@ export interface ProfileCard {
 export interface SearchProfilesRequest {
   skills?: string;
   designation?: string;
+  female_candidate?: boolean;
   location?: string[];
   min_experience?: number;
   max_experience?: number;
