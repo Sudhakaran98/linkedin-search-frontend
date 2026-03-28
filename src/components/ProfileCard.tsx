@@ -60,9 +60,12 @@ export default function ProfileCard({ profile }: Props) {
     profile.location_full ||
     [profile.location_city, profile.location_country].filter(Boolean).join(', ');
 
-  const currentRole = [profile.active_experience_title, profile.active_experience_company_name]
-    .filter(Boolean)
-    .join(' at ');
+  const currentRole =
+    profile.current_experience_label ||
+    [profile.active_experience_title, profile.active_experience_company_name]
+      .filter(Boolean)
+      .join(' at ');
+  const pastRoles = profile.past_experience_labels?.filter(Boolean).join(' • ');
   const experienceLabel = formatExperience(profile.total_experience_duration_months);
   const summaryPreview = truncateWords(profile.summary, 36);
 
@@ -133,12 +136,25 @@ export default function ProfileCard({ profile }: Props) {
 
         <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded-2xl bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Current
-            </p>
-            <p className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-slate-700">
-              {currentRole || profile.active_experience_title || 'Not available'}
-            </p>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Current
+                </p>
+                <p className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-slate-700">
+                  {currentRole || 'Not available'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Past
+                </p>
+                <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">
+                  {pastRoles || 'Not available'}
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="rounded-2xl bg-slate-50 px-4 py-3">
@@ -156,9 +172,7 @@ export default function ProfileCard({ profile }: Props) {
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                   Profile Summary
                 </p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {summaryPreview}
-                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{summaryPreview}</p>
               </div>
               <button
                 type="button"

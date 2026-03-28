@@ -18,6 +18,8 @@ export interface ProfileCard {
   active_experience_title?: string;
   active_experience_company_name?: string;
   active_experience_company_logo_url?: string;
+  current_experience_label?: string;
+  past_experience_labels?: string[];
   total_experience_duration_months?: number;
   linkedin_url?: string;
   score?: ProfileScore;
@@ -28,6 +30,8 @@ export interface SearchProfilesRequest {
   designation?: string;
   female_candidate?: boolean;
   location?: string[];
+  company_size_ranges?: string[];
+  company_categories?: string[];
   min_experience?: number;
   max_experience?: number;
   page?: number;
@@ -44,6 +48,14 @@ export interface SearchProfilesResponse {
 
 export interface LocationsResponse {
   locations: string[];
+  total: number;
+  page: number;
+  totalPages: number;
+  pageSize: number;
+}
+
+export interface CompanyCategoriesResponse {
+  companyCategories: string[];
   total: number;
   page: number;
   totalPages: number;
@@ -132,6 +144,19 @@ export const searchApi = createApi({
         return `/search/locations?${params.toString()}`;
       },
     }),
+    getCompanyCategories: builder.query<
+      CompanyCategoriesResponse,
+      { page?: number; search?: string }
+    >({
+      query: ({ page = 1, search = '' }) => {
+        const params = new URLSearchParams();
+        params.set('page', String(page));
+        if (search.trim()) {
+          params.set('search', search.trim());
+        }
+        return `/search/company-categories?${params.toString()}`;
+      },
+    }),
   }),
 });
 
@@ -139,4 +164,5 @@ export const {
   useSearchProfilesQuery,
   useGetProfileDetailQuery,
   useLazyGetLocationsQuery,
+  useLazyGetCompanyCategoriesQuery,
 } = searchApi;
