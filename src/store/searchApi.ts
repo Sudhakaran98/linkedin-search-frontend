@@ -32,6 +32,7 @@ export interface SearchProfilesRequest {
   location?: string[];
   company_size_ranges?: string[];
   company_categories?: string[];
+  company_category_scope?: 'current' | 'past';
   min_experience?: number;
   max_experience?: number;
   page?: number;

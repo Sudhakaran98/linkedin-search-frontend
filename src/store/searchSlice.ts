@@ -6,6 +6,7 @@ export interface SearchState {
   selectedLocations: string[];
   selectedCompanySizeRanges: string[];
   selectedCompanyCategories: string[];
+  companyCategoryScope: 'current' | 'past';
   minExperienceInput: string;
   maxExperienceInput: string;
   femaleCandidate: boolean;
@@ -14,6 +15,7 @@ export interface SearchState {
   submittedLocations: string[];
   submittedCompanySizeRanges: string[];
   submittedCompanyCategories: string[];
+  submittedCompanyCategoryScope: 'current' | 'past';
   submittedMinExperience: string;
   submittedMaxExperience: string;
   submittedFemaleCandidate: boolean;
@@ -28,6 +30,7 @@ const initialState: SearchState = {
   selectedLocations: [],
   selectedCompanySizeRanges: [],
   selectedCompanyCategories: [],
+  companyCategoryScope: 'current',
   minExperienceInput: '',
   maxExperienceInput: '',
   femaleCandidate: false,
@@ -36,6 +39,7 @@ const initialState: SearchState = {
   submittedLocations: [],
   submittedCompanySizeRanges: [],
   submittedCompanyCategories: [],
+  submittedCompanyCategoryScope: 'current',
   submittedMinExperience: '',
   submittedMaxExperience: '',
   submittedFemaleCandidate: false,
@@ -102,6 +106,9 @@ const searchSlice = createSlice({
     setSelectedCompanyCategories(state, action: PayloadAction<string[]>) {
       state.selectedCompanyCategories = [...action.payload];
     },
+    setCompanyCategoryScope(state, action: PayloadAction<'current' | 'past'>) {
+      state.companyCategoryScope = action.payload;
+    },
     setMinExperienceInput(state, action: PayloadAction<string>) {
       state.minExperienceInput = action.payload;
     },
@@ -117,6 +124,7 @@ const searchSlice = createSlice({
       state.submittedLocations = [...state.selectedLocations];
       state.submittedCompanySizeRanges = [...state.selectedCompanySizeRanges];
       state.submittedCompanyCategories = [...state.selectedCompanyCategories];
+      state.submittedCompanyCategoryScope = state.companyCategoryScope;
       state.submittedMinExperience = state.minExperienceInput.trim();
       state.submittedMaxExperience = state.maxExperienceInput.trim();
       state.submittedFemaleCandidate = state.femaleCandidate;
@@ -129,6 +137,7 @@ const searchSlice = createSlice({
       state.selectedLocations = [];
       state.selectedCompanySizeRanges = [];
       state.selectedCompanyCategories = [];
+      state.companyCategoryScope = 'current';
       state.minExperienceInput = '';
       state.maxExperienceInput = '';
       state.femaleCandidate = false;
@@ -137,6 +146,7 @@ const searchSlice = createSlice({
       state.submittedLocations = [];
       state.submittedCompanySizeRanges = [];
       state.submittedCompanyCategories = [];
+      state.submittedCompanyCategoryScope = 'current';
       state.submittedMinExperience = '';
       state.submittedMaxExperience = '';
       state.submittedFemaleCandidate = false;
@@ -170,6 +180,7 @@ export const {
   removeCompanyCategory,
   clearCompanyCategories,
   setSelectedCompanyCategories,
+  setCompanyCategoryScope,
   setMinExperienceInput,
   setMaxExperienceInput,
   setFemaleCandidate,

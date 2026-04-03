@@ -13,10 +13,12 @@ import {
   removeCompanySizeRange,
   removeLocation,
   setCurrentPage,
+  setCompanyCategoryScope,
   setFemaleCandidate,
   setDesignationInput,
   setMaxExperienceInput,
   setMinExperienceInput,
+  setSelectedCompanyCategories,
   setSelectedLocations,
   setSkillsInput,
   submitSearch,
@@ -40,6 +42,13 @@ const COMPANY_SIZE_OPTIONS = [
   '10,001+ employees',
 ] as const;
 
+const COMPANY_CATEGORY_SCOPE_OPTIONS = [
+  { value: 'current', label: 'Current company' },
+  { value: 'past', label: 'Past company' },
+] as const;
+
+const SELECT_ALL_FILTER_VALUE = 'Select All';
+
 export default function Home() {
   const dispatch = useAppDispatch();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -53,6 +62,7 @@ export default function Home() {
   const selectedLocations = useAppSelector((s) => s.search.selectedLocations);
   const selectedCompanySizeRanges = useAppSelector((s) => s.search.selectedCompanySizeRanges);
   const selectedCompanyCategories = useAppSelector((s) => s.search.selectedCompanyCategories);
+  const companyCategoryScope = useAppSelector((s) => s.search.companyCategoryScope);
   const minExperienceInput = useAppSelector((s) => s.search.minExperienceInput);
   const maxExperienceInput = useAppSelector((s) => s.search.maxExperienceInput);
   const femaleCandidate = useAppSelector((s) => s.search.femaleCandidate);
@@ -61,6 +71,9 @@ export default function Home() {
   const submittedLocations = useAppSelector((s) => s.search.submittedLocations);
   const submittedCompanySizeRanges = useAppSelector((s) => s.search.submittedCompanySizeRanges);
   const submittedCompanyCategories = useAppSelector((s) => s.search.submittedCompanyCategories);
+  const submittedCompanyCategoryScope = useAppSelector(
+    (s) => s.search.submittedCompanyCategoryScope
+  );
   const submittedMinExperience = useAppSelector((s) => s.search.submittedMinExperience);
   const submittedMaxExperience = useAppSelector((s) => s.search.submittedMaxExperience);
   const submittedFemaleCandidate = useAppSelector((s) => s.search.submittedFemaleCandidate);
@@ -102,6 +115,8 @@ export default function Home() {
         submittedCompanySizeRanges.length > 0 ? submittedCompanySizeRanges : undefined,
       company_categories:
         submittedCompanyCategories.length > 0 ? submittedCompanyCategories : undefined,
+      company_category_scope:
+        submittedCompanyCategories.length > 0 ? submittedCompanyCategoryScope : undefined,
       min_experience: submittedMinExperience ? Number(submittedMinExperience) : undefined,
       max_experience: submittedMaxExperience ? Number(submittedMaxExperience) : undefined,
       page: currentPage,
@@ -120,7 +135,9 @@ export default function Home() {
         submittedLocations.length > 0 ? submittedLocations.join(', ') : '',
         submittedCompanySizeRanges.length > 0 ? submittedCompanySizeRanges.join(', ') : '',
         submittedCompanyCategories.length > 0
-          ? submittedCompanyCategories.join(', ')
+          ? `${
+              submittedCompanyCategoryScope === 'past' ? 'Past company' : 'Current company'
+            }: ${submittedCompanyCategories.join(', ')}`
           : '',
         submittedMinExperience || submittedMaxExperience
           ? `${submittedMinExperience || '0'}-${submittedMaxExperience || 'Any'} years experience`
@@ -133,6 +150,7 @@ export default function Home() {
       submittedLocations,
       submittedCompanySizeRanges,
       submittedCompanyCategories,
+      submittedCompanyCategoryScope,
       submittedMinExperience,
       submittedMaxExperience,
     ]
@@ -153,6 +171,19 @@ export default function Home() {
   const allVisibleLocationsSelected =
     locationOptions.length > 0 &&
     locationOptions.every((location) => selectedLocations.includes(location));
+
+  const visibleCategoryOptions = useMemo(
+    () =>
+      categoryOptions.filter(
+        (category) =>
+          category.trim().toLowerCase() !== SELECT_ALL_FILTER_VALUE.toLowerCase()
+      ),
+    [categoryOptions]
+  );
+
+  const allVisibleCategoriesSelected =
+    visibleCategoryOptions.length > 0 &&
+    visibleCategoryOptions.every((category) => selectedCompanyCategories.includes(category));
 
   function showToast(message: string, tone: 'info' | 'error' = 'info') {
     if (toastTimerRef.current) {
@@ -338,6 +369,8 @@ export default function Home() {
             submittedCompanySizeRanges.length > 0 ? submittedCompanySizeRanges : undefined,
           company_categories:
             submittedCompanyCategories.length > 0 ? submittedCompanyCategories : undefined,
+          company_category_scope:
+            submittedCompanyCategories.length > 0 ? submittedCompanyCategoryScope : undefined,
           min_experience: submittedMinExperience ? Number(submittedMinExperience) : undefined,
           max_experience: submittedMaxExperience ? Number(submittedMaxExperience) : undefined,
         }),
@@ -651,21 +684,89 @@ export default function Home() {
 
                       {isCategoryOpen && (
                         <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[100] overflow-hidden rounded-2xl border border-cyan-100 bg-white shadow-[0_24px_60px_rgba(15,82,143,0.18)]">
-                          <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-700">
-                            Select company categories
+                          <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3">
+                            <div className="text-sm font-medium text-slate-700">
+                              Select company categories
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {COMPANY_CATEGORY_SCOPE_OPTIONS.map((option) => {
+                                const isDisabled = selectedCompanyCategories.length === 0;
+                                const isSelected = companyCategoryScope === option.value;
+
+                                return (
+                                  <label
+                                    key={option.value}
+                                    className={[
+                                      'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition',
+                                      isSelected
+                                        ? 'border-cyan-300 bg-cyan-50 text-cyan-800'
+                                        : 'border-slate-200 bg-white text-slate-600',
+                                      isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+                                    ].join(' ')}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="company-category-scope"
+                                      value={option.value}
+                                      checked={isSelected}
+                                      disabled={isDisabled}
+                                      onChange={() =>
+                                        dispatch(setCompanyCategoryScope(option.value))
+                                      }
+                                      className="h-3.5 w-3.5 border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                                    />
+                                    <span>{option.label}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
                           </div>
 
                           <div
                             className="max-h-72 overflow-y-auto py-2"
                             onScroll={handleCategoryScroll}
                           >
-                            {categoryOptions.length === 0 && !categoriesFetching && (
+                            <div className="border-b border-slate-100 px-4 py-3">
+                              <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  checked={allVisibleCategoriesSelected}
+                                  onChange={(event) => {
+                                    if (event.target.checked) {
+                                      dispatch(
+                                        setSelectedCompanyCategories(
+                                          Array.from(
+                                            new Set([
+                                              ...selectedCompanyCategories,
+                                              ...visibleCategoryOptions,
+                                            ])
+                                          )
+                                        )
+                                      );
+                                    } else {
+                                      dispatch(
+                                        setSelectedCompanyCategories(
+                                          selectedCompanyCategories.filter(
+                                            (category) =>
+                                              !visibleCategoryOptions.includes(category)
+                                          )
+                                        )
+                                      );
+                                    }
+                                  }}
+                                  className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                                />
+                                <span>Select all</span>
+                              </label>
+                            </div>
+
+                            {visibleCategoryOptions.length === 0 && !categoriesFetching && (
                               <div className="px-4 py-3 text-sm text-slate-500">
                                 No company categories found.
                               </div>
                             )}
 
-                            {categoryOptions.map((category) => {
+                            {visibleCategoryOptions.map((category) => {
                               const isSelected = selectedCompanyCategories.includes(category);
 
                               return (
@@ -739,6 +840,7 @@ export default function Home() {
                       dispatch(clearLocations());
                       dispatch(clearCompanySizeRanges());
                       dispatch(clearCompanyCategories());
+                      dispatch(setCompanyCategoryScope('current'));
                       dispatch(setMinExperienceInput(''));
                       dispatch(setMaxExperienceInput(''));
                       dispatch(setFemaleCandidate(false));
@@ -751,10 +853,13 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsFiltersOpen(false)}
+                    onClick={() => {
+                      dispatch(submitSearch());
+                      setIsFiltersOpen(false);
+                    }}
                     className="inline-flex h-11 items-center justify-center rounded-full border border-cyan-200 bg-cyan-50 px-4 text-sm font-semibold text-cyan-800 transition hover:bg-cyan-100"
                   >
-                    Done
+                    Search
                   </button>
                 </div>
               </div>
