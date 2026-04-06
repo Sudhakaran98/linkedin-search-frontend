@@ -1,13 +1,19 @@
-import React, { useMemo, useState } from 'react';
-import type { ProfileCard as ProfileCardType } from '../store/searchApi';
+import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  useUpdateGenderMutation,
+  type ProfileCard as ProfileCardType,
+} from '../store/searchApi';
 import { useAppDispatch } from '../store/hooks';
 import { openProfile } from '../store/searchSlice';
 
 const DEFAULT_AVATAR =
   'https://static.licdn.com/aero-v1/sc/h/9c8pery4andzj6ohjkjp54ma2';
+const GENDER_OPTIONS = ['male', 'female'] as const;
 
 interface Props {
   profile: ProfileCardType;
+  onGenderUpdateToast?: (message: string, tone?: 'info' | 'error') => void;
 }
 
 function formatExperience(months?: number) {
@@ -38,8 +44,9 @@ function truncateWords(text?: string, limit = 36) {
   return `${words.slice(0, limit).join(' ')}...`;
 }
 
-export default function ProfileCard({ profile }: Props) {
+export default function ProfileCard({ profile, onGenderUpdateToast }: Props) {
   const dispatch = useAppDispatch();
+  const [updateGender, { isLoading: isUpdatingGender }] = useUpdateGenderMutation();
   const initials = useMemo(
     () =>
       profile.full_name
@@ -55,6 +62,13 @@ export default function ProfileCard({ profile }: Props) {
     profile.picture_proxy_url || profile.picture_url || DEFAULT_AVATAR
   );
   const [showInitialsFallback, setShowInitialsFallback] = useState(false);
+  const [localGender, setLocalGender] = useState(profile.gender);
+  const [pendingGender, setPendingGender] = useState<(typeof GENDER_OPTIONS)[number] | null>(null);
+  const [genderError, setGenderError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLocalGender(profile.gender);
+  }, [profile.gender]);
 
   const location =
     profile.location_full ||
@@ -69,9 +83,42 @@ export default function ProfileCard({ profile }: Props) {
   const experienceLabel = formatExperience(profile.total_experience_duration_months);
   const summaryPreview = truncateWords(profile.summary, 36);
 
+  async function handleGenderChange(nextGender: (typeof GENDER_OPTIONS)[number]) {
+    if (nextGender === localGender || isUpdatingGender) {
+      return;
+    }
+
+    setGenderError(null);
+    setPendingGender(nextGender);
+  }
+
+  async function confirmGenderChange() {
+    if (!pendingGender) {
+      return;
+    }
+
+    try {
+      await updateGender({
+        fullName: profile.full_name,
+        gender: pendingGender,
+      }).unwrap();
+      setLocalGender(pendingGender);
+      setPendingGender(null);
+      onGenderUpdateToast?.(
+        `Updated gender to ${pendingGender} for all profiles matching "${profile.full_name}".`,
+        'info'
+      );
+    } catch {
+      const message = 'Failed to update gender. Please try again.';
+      setGenderError(message);
+      onGenderUpdateToast?.(message, 'error');
+    }
+  }
+
   return (
-    <div className="w-full rounded-[26px] border border-slate-200 bg-white px-5 py-5 text-left shadow-sm">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
+    <>
+      <div className="w-full rounded-[26px] border border-slate-200 bg-white px-5 py-5 text-left shadow-sm">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
         <div className="relative flex items-start gap-4 lg:w-[320px] lg:flex-none">
           <div className="relative h-24 w-24 overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100 shadow-sm">
             {!showInitialsFallback ? (
@@ -117,6 +164,37 @@ export default function ProfileCard({ profile }: Props) {
                 </span>
               )}
             </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {/* <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Gender
+              </span> */}
+              <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
+                {GENDER_OPTIONS.map((genderOption) => {
+                  const isSelected = localGender === genderOption;
+
+                  return (
+                    <button
+                      key={genderOption}
+                      type="button"
+                      disabled={isUpdatingGender}
+                      onClick={() => handleGenderChange(genderOption)}
+                      className={[
+                        'rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition',
+                        isSelected
+                          ? 'bg-cyan-600 text-white'
+                          : 'text-slate-600 hover:bg-white',
+                        isUpdatingGender ? 'cursor-not-allowed opacity-70' : '',
+                      ].join(' ')}
+                    >
+                      {genderOption}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {genderError && <p className="mt-2 text-xs text-rose-600">{genderError}</p>}
           </div>
 
           {profile.linkedin_url && (
@@ -185,6 +263,45 @@ export default function ProfileCard({ profile }: Props) {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+
+      {pendingGender &&
+        createPortal(
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-[28px] border border-cyan-100 bg-white p-6 shadow-[0_30px_80px_rgba(15,82,143,0.22)]">
+              <div className="inline-flex rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">
+                Confirm gender update
+              </div>
+              <h3 className="mt-4 text-xl font-semibold tracking-tight text-slate-900">
+                Update all matching profiles?
+              </h3>
+              <p className="mt-3 text-sm leading-7 text-slate-600">
+                Do you think everyone with the name "{profile.full_name}" are{' '}
+                {pendingGender === 'male' ? 'Male' : 'Female'}? This will update all matched
+                profiles.
+              </p>
+              <div className="mt-6 flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPendingGender(null)}
+                  disabled={isUpdatingGender}
+                  className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmGenderChange}
+                  disabled={isUpdatingGender}
+                  className="inline-flex h-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#4f7cff_0%,#1cc8a0_100%)] px-5 text-sm font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isUpdatingGender ? 'Saving...' : 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
   );
 }

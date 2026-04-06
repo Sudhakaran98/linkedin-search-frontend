@@ -8,6 +8,7 @@ export interface ProfileScore {
 export interface ProfileCard {
   id: string;
   full_name: string;
+  gender?: 'male' | 'female';
   headline?: string;
   summary?: string;
   picture_url?: string;
@@ -61,6 +62,18 @@ export interface CompanyCategoriesResponse {
   page: number;
   totalPages: number;
   pageSize: number;
+}
+
+export interface UpdateGenderRequest {
+  fullName: string;
+  gender: 'male' | 'female';
+}
+
+export interface UpdateGenderResponse {
+  fullName: string;
+  gender: 'male' | 'female';
+  matchedProfiles: number;
+  openSearchUpdated: number;
 }
 
 export interface Experience {
@@ -121,6 +134,7 @@ export interface ProfileDetail {
 
 export const searchApi = createApi({
   reducerPath: 'searchApi',
+  tagTypes: ['Profiles'],
   baseQuery: fetchBaseQuery({
     baseUrl: '/api',
   }),
@@ -131,6 +145,7 @@ export const searchApi = createApi({
         method: 'POST',
         body,
       }),
+      providesTags: ['Profiles'],
     }),
     getProfileDetail: builder.query<ProfileDetail, string>({
       query: (profileId) => `/search/profile/${profileId}`,
@@ -158,6 +173,14 @@ export const searchApi = createApi({
         return `/search/company-categories?${params.toString()}`;
       },
     }),
+    updateGender: builder.mutation<UpdateGenderResponse, UpdateGenderRequest>({
+      query: (body) => ({
+        url: '/search/profiles/gender',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Profiles'],
+    }),
   }),
 });
 
@@ -166,4 +189,5 @@ export const {
   useGetProfileDetailQuery,
   useLazyGetLocationsQuery,
   useLazyGetCompanyCategoriesQuery,
+  useUpdateGenderMutation,
 } = searchApi;

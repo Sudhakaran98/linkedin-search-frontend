@@ -958,7 +958,11 @@ export default function Home() {
             {profilesData && profilesData.profiles.length > 0 && !isSearching && (
               <div className="space-y-4">
                 {profilesData.profiles.map((profile) => (
-                  <ProfileCard key={profile.id} profile={profile} />
+                  <ProfileCard
+                    key={profile.id}
+                    profile={profile}
+                    onGenderUpdateToast={showToast}
+                  />
                 ))}
               </div>
             )}
