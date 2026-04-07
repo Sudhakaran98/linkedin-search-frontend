@@ -666,12 +666,12 @@ export default function Home() {
                   <div className="space-y-6">
                     <div className="relative" ref={categoryDropdownRef}>
                       <label className="mb-2 block text-sm font-semibold text-slate-700">
-                        Company categories
+                        Company domains
                       </label>
                       <div className="flex h-[52px] items-center rounded-2xl border border-slate-300 bg-white px-4 transition focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
                         <input
                           type="text"
-                          placeholder="Search company categories"
+                          placeholder="Search company domains"
                           value={categorySearch}
                           onFocus={() => setIsCategoryOpen(true)}
                           onChange={(event) => {
@@ -686,7 +686,7 @@ export default function Home() {
                         <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[100] overflow-hidden rounded-2xl border border-cyan-100 bg-white shadow-[0_24px_60px_rgba(15,82,143,0.18)]">
                           <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3">
                             <div className="text-sm font-medium text-slate-700">
-                              Select company categories
+                              Select company domains
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                               {COMPANY_CATEGORY_SCOPE_OPTIONS.map((option) => {
@@ -762,7 +762,7 @@ export default function Home() {
 
                             {visibleCategoryOptions.length === 0 && !categoriesFetching && (
                               <div className="px-4 py-3 text-sm text-slate-500">
-                                No company categories found.
+                                No company domains found.
                               </div>
                             )}
 
@@ -793,7 +793,7 @@ export default function Home() {
 
                             {categoriesFetching && (
                               <div className="px-4 py-3 text-sm text-slate-400">
-                                Loading company categories...
+                                Loading company domains...
                               </div>
                             )}
                           </div>
