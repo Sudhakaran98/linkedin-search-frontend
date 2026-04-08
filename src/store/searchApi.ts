@@ -8,6 +8,7 @@ export interface ProfileScore {
 export interface ProfileCard {
   id: string;
   full_name: string;
+  first_name: string;
   gender?: 'male' | 'female';
   headline?: string;
   summary?: string;
@@ -65,12 +66,12 @@ export interface CompanyCategoriesResponse {
 }
 
 export interface UpdateGenderRequest {
-  fullName: string;
+  firstName: string;
   gender: 'male' | 'female';
 }
 
 export interface UpdateGenderResponse {
-  fullName: string;
+  firstName: string;
   gender: 'male' | 'female';
   matchedProfiles: number;
   openSearchUpdated: number;

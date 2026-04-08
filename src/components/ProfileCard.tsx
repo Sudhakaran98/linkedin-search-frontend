@@ -99,13 +99,13 @@ export default function ProfileCard({ profile, onGenderUpdateToast }: Props) {
 
     try {
       await updateGender({
-        fullName: profile.full_name,
+        firstName: profile.first_name,
         gender: pendingGender,
       }).unwrap();
       setLocalGender(pendingGender);
       setPendingGender(null);
       onGenderUpdateToast?.(
-        `Updated gender to ${pendingGender} for all profiles matching "${profile.full_name}".`,
+        `Updated gender to ${pendingGender} for all profiles matching first name "${profile.first_name}".`,
         'info'
       );
     } catch {
@@ -276,8 +276,8 @@ export default function ProfileCard({ profile, onGenderUpdateToast }: Props) {
                 Update all matching profiles?
               </h3>
               <p className="mt-3 text-sm leading-7 text-slate-600">
-                Do you think everyone with the name "{profile.full_name}" are{' '}
-                {pendingGender === 'male' ? 'Male' : 'Female'}? This will update all matched
+                Do you think everyone with the first name "{profile.first_name}" is{' '}
+                {pendingGender === 'male' ? 'male' : 'female'}? This will update all matched
                 profiles.
               </p>
               <div className="mt-6 flex flex-wrap justify-end gap-3">
