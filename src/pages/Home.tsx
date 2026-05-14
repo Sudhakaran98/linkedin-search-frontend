@@ -94,6 +94,8 @@ export default function Home() {
   const [categoryPage, setCategoryPage] = useState(1);
   const [categoryTotalPages, setCategoryTotalPages] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadType, setDownloadType] = useState<'all' | 'salesql'>('all');
   const [toast, setToast] = useState<{
     message: string;
     tone: 'info' | 'error';
@@ -420,7 +422,8 @@ export default function Home() {
     }
   }
 
-  async function handleDownload() {
+  async function handleDownload(type: 'all' | 'salesql') {
+    setShowDownloadModal(false);
     try {
       setIsDownloading(true);
       showToast(
@@ -434,6 +437,7 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          download_type: type,
           skills: submittedSkills || undefined,
           designation: submittedDesignation || undefined,
           female_candidate: submittedFemaleCandidate || undefined,
@@ -466,7 +470,7 @@ export default function Home() {
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = 'profiles-export.csv';
+      anchor.download = type === 'salesql' ? 'salesql-profiles-export.csv' : 'profiles-export.csv';
       anchor.click();
       window.URL.revokeObjectURL(url);
       showToast('Export is ready and the CSV download should start shortly.', 'info');
@@ -999,7 +1003,7 @@ export default function Home() {
                   )}
                   <button
                     type="button"
-                    onClick={handleDownload}
+                    onClick={() => { setDownloadType('all'); setShowDownloadModal(true); }}
                     disabled={isDownloading || resultCount === 0}
                     className="inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#4f7cff_0%,#1cc8a0_100%)] px-4 py-2 font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
                   >
@@ -1112,6 +1116,80 @@ export default function Home() {
       </main>
 
       <ProfileDetailModal />
+
+      {showDownloadModal && createPortal(
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm"
+          onClick={() => setShowDownloadModal(false)}
+        >
+          <div
+            className="w-full max-w-sm overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_32px_80px_rgba(15,23,42,0.18)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Download CSV</h3>
+              <button
+                type="button"
+                onClick={() => setShowDownloadModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              {(['all', 'salesql'] as const).map((type) => (
+                <label
+                  key={type}
+                  className={[
+                    'flex cursor-pointer items-center gap-4 rounded-xl border px-4 py-3.5 transition',
+                    downloadType === type
+                      ? 'border-violet-300 bg-violet-50'
+                      : 'border-slate-200 bg-white hover:bg-slate-50',
+                  ].join(' ')}
+                >
+                  <input
+                    type="radio"
+                    name="download_type"
+                    value={type}
+                    checked={downloadType === type}
+                    onChange={() => setDownloadType(type)}
+                    className="h-4 w-4 accent-violet-600"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {type === 'all' ? 'All Profiles' : 'SalesQL Profiles'}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {type === 'all'
+                        ? 'Export all profiles matching your current filters'
+                        : 'Export only profiles enriched with SalesQL contact data'}
+                    </p>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setShowDownloadModal(false)}
+                className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownload(downloadType)}
+                className="inline-flex h-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,#4f7cff_0%,#1cc8a0_100%)] px-5 text-sm font-semibold text-white transition hover:brightness-105"
+              >
+                Download
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
