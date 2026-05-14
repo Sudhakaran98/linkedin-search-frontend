@@ -3,6 +3,9 @@ import { createPortal } from 'react-dom';
 import {
   useUpdateGenderMutation,
   type ProfileCard as ProfileCardType,
+  type EnrichContactResult,
+  type SalesqlEmail,
+  type SalesqlPhone,
 } from '../store/searchApi';
 import { useAppDispatch } from '../store/hooks';
 import { openProfile } from '../store/searchSlice';
@@ -13,6 +16,9 @@ const GENDER_OPTIONS = ['male', 'female'] as const;
 
 interface Props {
   profile: ProfileCardType;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
+  contactInfo?: EnrichContactResult;
   onGenderUpdateToast?: (message: string, tone?: 'info' | 'error') => void;
 }
 
@@ -44,7 +50,7 @@ function truncateWords(text?: string, limit = 36) {
   return `${words.slice(0, limit).join(' ')}...`;
 }
 
-export default function ProfileCard({ profile, onGenderUpdateToast }: Props) {
+export default function ProfileCard({ profile, isSelected, onToggleSelect, contactInfo, onGenderUpdateToast }: Props) {
   const dispatch = useAppDispatch();
   const [updateGender, { isLoading: isUpdatingGender }] = useUpdateGenderMutation();
   const initials = useMemo(
@@ -65,6 +71,7 @@ export default function ProfileCard({ profile, onGenderUpdateToast }: Props) {
   const [localGender, setLocalGender] = useState(profile.gender);
   const [pendingGender, setPendingGender] = useState<(typeof GENDER_OPTIONS)[number] | null>(null);
   const [genderError, setGenderError] = useState<string | null>(null);
+  const [showContactPopup, setShowContactPopup] = useState(false);
 
   useEffect(() => {
     setLocalGender(profile.gender);
@@ -117,10 +124,20 @@ export default function ProfileCard({ profile, onGenderUpdateToast }: Props) {
 
   return (
     <>
-      <div className="w-full rounded-[26px] border border-slate-200 bg-white px-5 py-5 text-left shadow-sm">
+      <div className={[
+        'w-full rounded-[26px] border bg-white px-5 py-5 text-left shadow-sm transition',
+        isSelected ? 'border-violet-300 ring-2 ring-violet-100' : 'border-slate-200',
+      ].join(' ')}>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
         <div className="relative flex items-start gap-4 lg:w-[320px] lg:flex-none">
-          <div className="relative h-24 w-24 overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100 shadow-sm">
+          <input
+            type="checkbox"
+            checked={isSelected ?? false}
+            onChange={onToggleSelect}
+            onClick={(e) => e.stopPropagation()}
+            className="absolute left-0 top-0 z-10 h-4 w-4 cursor-pointer rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+          />
+          <div className="relative mt-5 h-24 w-24 overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100 shadow-sm">
             {!showInitialsFallback ? (
               <img
                 src={imageSrc}
@@ -210,6 +227,22 @@ export default function ProfileCard({ profile, onGenderUpdateToast }: Props) {
               </svg>
             </a>
           )}
+
+          {(contactInfo !== undefined || profile.salesql_enriched_at) && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowContactPopup(true); }}
+              className="absolute right-0 top-9 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-100 bg-white shadow-sm transition hover:border-violet-200 hover:shadow"
+              title="View contact info"
+            >
+              <svg viewBox="0 0 48 48" className="h-5 w-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 28 C10 10, 38 10, 38 24" stroke="#3B82F6" strokeWidth="5.5" strokeLinecap="round" fill="none" />
+                <path d="M32 19 L38 24 L44 19" stroke="#3B82F6" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path d="M38 24 C38 40, 10 40, 10 28" stroke="#F97316" strokeWidth="5.5" strokeLinecap="round" fill="none" />
+                <path d="M16 33 L10 28 L4 33" stroke="#F97316" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </button>
+          )}
         </div>
 
         <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-2">
@@ -263,7 +296,155 @@ export default function ProfileCard({ profile, onGenderUpdateToast }: Props) {
           </div>
         </div>
       </div>
-      </div>
+    </div>
+
+      {showContactPopup &&
+        createPortal(
+          (() => {
+            const popupEmails: SalesqlEmail[] = contactInfo?.emails ?? profile.salesql_emails ?? [];
+            const popupPhones: SalesqlPhone[] = contactInfo?.phones ?? profile.salesql_phones ?? [];
+            const hasError = Boolean(contactInfo?.error);
+            const hasData = popupEmails.length > 0 || popupPhones.length > 0;
+
+            return (
+              <div
+                className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm"
+                onClick={() => setShowContactPopup(false)}
+              >
+                <div
+                  className="w-full max-w-lg overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_32px_80px_rgba(15,23,42,0.18)]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 border border-slate-200">
+                        <svg viewBox="0 0 48 48" className="h-5 w-5" fill="none">
+                          <path d="M10 28 C10 10, 38 10, 38 24" stroke="#3B82F6" strokeWidth="5.5" strokeLinecap="round" fill="none" />
+                          <path d="M32 19 L38 24 L44 19" stroke="#3B82F6" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                          <path d="M38 24 C38 40, 10 40, 10 28" stroke="#F97316" strokeWidth="5.5" strokeLinecap="round" fill="none" />
+                          <path d="M16 33 L10 28 L4 33" stroke="#F97316" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-900">Contact Information</h3>
+                        <p className="text-xs text-slate-400">{profile.full_name}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowContactPopup(false)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Body */}
+                  <div className="px-6 py-5 space-y-5">
+
+                    {hasError && (
+                      <div className="flex items-center gap-3 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-4 w-4 shrink-0 text-rose-400">
+                          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <p className="text-sm text-rose-600">Could not retrieve contact info for this profile.</p>
+                      </div>
+                    )}
+
+                    {!hasError && !hasData && (
+                      <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-4 w-4 shrink-0 text-slate-400">
+                          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <p className="text-sm text-slate-500">Profile not found in SalesQL database.</p>
+                      </div>
+                    )}
+
+                    {popupEmails.length > 0 && (
+                      <div>
+                        <div className="mb-3 flex items-center gap-2">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4 text-slate-400">
+                            <path d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z" />
+                            <polyline points="22,6 12,13 2,6" />
+                          </svg>
+                          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Email Address</span>
+                        </div>
+                        <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
+                          {popupEmails.map((e, i) => (
+                            <div key={`${e.email}-${i}`} className="flex items-center justify-between gap-3 bg-white px-4 py-3 hover:bg-slate-50 transition">
+                              <a href={`mailto:${e.email}`} className="flex items-center gap-2.5 min-w-0">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4 text-blue-500">
+                                    <path d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z" />
+                                    <polyline points="22,6 12,13 2,6" />
+                                  </svg>
+                                </div>
+                                <span className="truncate text-sm font-medium text-slate-700 hover:text-blue-600 hover:underline">{e.email}</span>
+                              </a>
+                              <div className="flex shrink-0 items-center gap-1.5">
+                                {e.type && (
+                                  <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-600">{e.type}</span>
+                                )}
+                                {e.status && (
+                                  <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${e.status.toLowerCase() === 'valid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                                    {e.status}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {popupPhones.length > 0 && (
+                      <div>
+                        <div className="mb-3 flex items-center gap-2">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4 text-slate-400">
+                            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8a19.79 19.79 0 01-3.07-8.63A2 2 0 012 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+                          </svg>
+                          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Phone Number</span>
+                        </div>
+                        <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
+                          {popupPhones.map((p, i) => (
+                            <div key={`${p.phone}-${i}`} className="flex items-center justify-between gap-3 bg-white px-4 py-3 hover:bg-slate-50 transition">
+                              <a href={`tel:${p.phone}`} className="flex items-center gap-2.5 min-w-0">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4 text-violet-500">
+                                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8a19.79 19.79 0 01-3.07-8.63A2 2 0 012 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+                                  </svg>
+                                </div>
+                                <span className="truncate text-sm font-medium text-slate-700 hover:text-blue-600 hover:underline">{p.phone}</span>
+                              </a>
+                              <div className="flex shrink-0 items-center gap-1.5">
+                                {p.type && (
+                                  <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-600">{p.type}</span>
+                                )}
+                                {p.country_code && (
+                                  <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-500">{p.country_code}</span>
+                                )}
+                                {p.is_valid !== undefined && (
+                                  <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${p.is_valid ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                                    {p.is_valid ? 'Valid' : 'Invalid'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                </div>
+              </div>
+            </div>
+            );
+          })(),
+          document.body
+        )}
 
       {pendingGender &&
         createPortal(

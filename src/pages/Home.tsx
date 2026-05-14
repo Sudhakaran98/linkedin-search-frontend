@@ -27,6 +27,8 @@ import {
   useLazyGetCompanyCategoriesQuery,
   useLazyGetLocationsQuery,
   useSearchProfilesQuery,
+  useEnrichProfilesMutation,
+  type EnrichContactResult,
 } from '../store/searchApi';
 import ProfileCard from '../components/ProfileCard';
 import ProfileDetailModal from '../components/ProfileDetailModal';
@@ -96,6 +98,9 @@ export default function Home() {
     message: string;
     tone: 'info' | 'error';
   } | null>(null);
+  const [selectedProfileIds, setSelectedProfileIds] = useState<Set<string>>(new Set());
+  const [enrichmentResults, setEnrichmentResults] = useState<Record<string, EnrichContactResult>>({});
+  const [enrichProfiles, { isLoading: isEnriching }] = useEnrichProfilesMutation();
 
   const [triggerLocations, { isFetching: locationsFetching }] = useLazyGetLocationsQuery();
   const [triggerCompanyCategories, { isFetching: categoriesFetching }] =
@@ -344,6 +349,74 @@ export default function Home() {
 
     if (nearBottom && !categoriesFetching && categoryPage < categoryTotalPages) {
       loadCompanyCategories(categoryPage + 1, categorySearch, false);
+    }
+  }
+
+  function handleToggleProfileSelect(profileId: string) {
+    setSelectedProfileIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(profileId)) {
+        next.delete(profileId);
+      } else {
+        next.add(profileId);
+      }
+      return next;
+    });
+  }
+
+  function handleSelectAllProfiles() {
+    if (!profilesData) return;
+    const allIds = profilesData.profiles.map((p) => p.id);
+    const allSelected = allIds.every((id) => selectedProfileIds.has(id));
+    if (allSelected) {
+      setSelectedProfileIds((prev) => {
+        const next = new Set(prev);
+        allIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedProfileIds((prev) => new Set([...prev, ...allIds]));
+    }
+  }
+
+  async function handleRevealContacts() {
+    if (!profilesData) return;
+    const selectedProfiles = profilesData.profiles.filter((p) => selectedProfileIds.has(p.id));
+    const linkedinUrls = selectedProfiles
+      .map((p) => p.linkedin_url)
+      .filter((url): url is string => Boolean(url));
+
+    if (linkedinUrls.length === 0) {
+      showToast('Selected profiles have no LinkedIn URLs.', 'error');
+      return;
+    }
+
+    try {
+      const response = await enrichProfiles({ linkedin_urls: linkedinUrls }).unwrap();
+      setEnrichmentResults((prev) => ({ ...prev, ...response.results }));
+      setSelectedProfileIds(new Set());
+
+      const found = Object.values(response.results).filter(
+        (r) => !r.error && (r.emails.length > 0 || r.phones.length > 0)
+      ).length;
+      const notFound = Object.values(response.results).filter(
+        (r) => !r.error && r.emails.length === 0 && r.phones.length === 0
+      ).length;
+      const errored = Object.values(response.results).filter((r) => Boolean(r.error)).length;
+
+      if (found > 0) {
+        const parts = [`Contact info found for ${found} profile(s).`];
+        if (notFound > 0) parts.push(`${notFound} not in SalesQL database.`);
+        if (errored > 0) parts.push(`${errored} failed.`);
+        showToast(parts.join(' '), 'info');
+      } else if (notFound > 0) {
+        showToast(`No contact info found — ${notFound} profile(s) not in SalesQL database.`, 'error');
+      } else {
+        showToast('Failed to retrieve contact info. Please try again.', 'error');
+      }
+    } catch {
+      setSelectedProfileIds(new Set());
+      showToast('Failed to reach the enrichment API. Please try again.', 'error');
     }
   }
 
@@ -912,15 +985,28 @@ export default function Home() {
               </div>
 
               <div className="flex min-h-full flex-col justify-between gap-4 lg:items-end">
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  disabled={isDownloading || resultCount === 0}
-                  className="inline-flex items-center justify-center gap-2 self-start rounded-full bg-[linear-gradient(135deg,#4f7cff_0%,#1cc8a0_100%)] px-4 py-2 font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70 lg:self-end"
-                >
-                  {isDownloading && <span className="rm-spinner h-4 w-4 border-white/35 border-t-white" />}
-                  {isDownloading ? 'Downloading...' : 'Download CSV'}
-                </button>
+                <div className="flex flex-wrap gap-2 self-start lg:self-end">
+                  {selectedProfileIds.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleRevealContacts}
+                      disabled={isEnriching}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-2 font-semibold text-violet-700 transition hover:border-violet-300 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {isEnriching && <span className="rm-spinner h-4 w-4 border-white/35 border-t-white" />}
+                      {isEnriching ? 'Revealing...' : `Reveal Contacts (${selectedProfileIds.size})`}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    disabled={isDownloading || resultCount === 0}
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#4f7cff_0%,#1cc8a0_100%)] px-4 py-2 font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isDownloading && <span className="rm-spinner h-4 w-4 border-white/35 border-t-white" />}
+                    {isDownloading ? 'Downloading...' : 'Download CSV'}
+                  </button>
+                </div>
 
                 <div className="flex flex-nowrap gap-2 text-sm text-slate-500 lg:justify-end">
                   <span className="whitespace-nowrap rounded-full bg-slate-100 px-3 py-2">
@@ -957,10 +1043,38 @@ export default function Home() {
 
             {profilesData && profilesData.profiles.length > 0 && !isSearching && (
               <div className="space-y-4">
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                  <input
+                    type="checkbox"
+                    id="select-all-profiles"
+                    checked={
+                      profilesData.profiles.length > 0 &&
+                      profilesData.profiles.every((p) => selectedProfileIds.has(p.id))
+                    }
+                    onChange={handleSelectAllProfiles}
+                    className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                  />
+                  <label htmlFor="select-all-profiles" className="cursor-pointer text-sm font-semibold text-slate-700">
+                    Select All ({profilesData.profiles.length} on this page)
+                  </label>
+                  {selectedProfileIds.size > 0 && (
+                    <span className="ml-auto rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                      {selectedProfileIds.size} selected
+                    </span>
+                  )}
+                </div>
                 {profilesData.profiles.map((profile) => (
                   <ProfileCard
                     key={profile.id}
                     profile={profile}
+                    isSelected={selectedProfileIds.has(profile.id)}
+                    onToggleSelect={() => handleToggleProfileSelect(profile.id)}
+                    contactInfo={enrichmentResults[profile.linkedin_url ?? ''] ?? (
+                      profile.salesql_enriched_at ? {
+                        emails: profile.salesql_emails ?? [],
+                        phones: profile.salesql_phones ?? [],
+                      } : undefined
+                    )}
                     onGenderUpdateToast={showToast}
                   />
                 ))}

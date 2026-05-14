@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { closeProfile } from '../store/searchSlice';
-import { ProfileDetail, type Skill, useGetProfileDetailQuery } from '../store/searchApi';
+import { ProfileDetail, type Skill, type SalesqlEmail, type SalesqlPhone, useGetProfileDetailQuery } from '../store/searchApi';
 
 const DEFAULT_AVATAR =
   'https://static.licdn.com/aero-v1/sc/h/9c8pery4andzj6ohjkjp54ma2';
@@ -66,6 +66,9 @@ const RESERVED_SECTION_KEYS = new Set([
   'experiences',
   'educations',
   'skills',
+  'salesql_emails',
+  'salesql_phones',
+  'salesql_enriched_at',
 ]);
 
 function startCase(value: string): string {
@@ -438,19 +441,21 @@ export default function ProfileDetailModal() {
                         </div>
                       </div>
 
-                      {profile.linkedin_url && (
-                        <a
-                          href={profile.linkedin_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`Open ${profile.full_name} on LinkedIn`}
-                          className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#0A66C2] text-white transition hover:brightness-105"
-                        >
-                          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current">
-                            <path d="M20.45 20.45h-3.56v-5.58c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.95v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.26 2.37 4.26 5.46v6.28zM5.34 7.43a2.07 2.07 0 110-4.14 2.07 2.07 0 010 4.14zM7.12 20.45H3.56V9h3.56v11.45z" />
-                          </svg>
-                        </a>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {profile.linkedin_url && (
+                          <a
+                            href={profile.linkedin_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Open ${profile.full_name} on LinkedIn`}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#0A66C2] text-white transition hover:brightness-105"
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current">
+                              <path d="M20.45 20.45h-3.56v-5.58c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.95v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.26 2.37 4.26 5.46v6.28zM5.34 7.43a2.07 2.07 0 110-4.14 2.07 2.07 0 010 4.14zM7.12 20.45H3.56V9h3.56v11.45z" />
+                            </svg>
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </section>
@@ -532,6 +537,77 @@ export default function ProfileDetailModal() {
 
           {profile && (
             <div className="w-full space-y-4 lg:w-4/12">
+              {profile.salesql_enriched_at && (
+                <Card title="Contact Info">
+                  <div className="space-y-4">
+                    {(!profile.salesql_emails?.length && !profile.salesql_phones?.length) && (
+                      <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-4 w-4 shrink-0 text-slate-400">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="12" />
+                          <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        Profile not found in SalesQL database.
+                      </div>
+                    )}
+                    {profile.salesql_emails && profile.salesql_emails.length > 0 && (
+                      <div>
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Email</p>
+                        <div className="space-y-2">
+                          {(profile.salesql_emails as SalesqlEmail[]).map((e, i) => (
+                            <div key={`${e.email}-${i}`} className="flex flex-wrap items-center gap-2">
+                              <a href={`mailto:${e.email}`} className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-4 w-4 shrink-0 text-slate-400">
+                                  <path d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z" />
+                                  <polyline points="22,6 12,13 2,6" />
+                                </svg>
+                                {e.email}
+                              </a>
+                              <div className="flex flex-wrap gap-1">
+                                {e.type && (
+                                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium capitalize text-blue-700">{e.type}</span>
+                                )}
+                                {e.status && (
+                                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${e.status === 'valid' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-600'}`}>{e.status}</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {profile.salesql_phones && profile.salesql_phones.length > 0 && (
+                      <div>
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Phone</p>
+                        <div className="space-y-2">
+                          {(profile.salesql_phones as SalesqlPhone[]).map((p, i) => (
+                            <div key={`${p.phone}-${i}`} className="flex flex-wrap items-center gap-2">
+                              <a href={`tel:${p.phone}`} className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-4 w-4 shrink-0 text-slate-400">
+                                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8a19.79 19.79 0 01-3.07-8.63A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z" />
+                                </svg>
+                                {p.phone}
+                              </a>
+                              <div className="flex flex-wrap gap-1">
+                                {p.type && (
+                                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium capitalize text-blue-700">{p.type}</span>
+                                )}
+                                {p.country_code && (
+                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{p.country_code}</span>
+                                )}
+                                {p.is_valid !== undefined && (
+                                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${p.is_valid ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{p.is_valid ? 'Valid' : 'Invalid'}</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
               {skillNames.length > 0 && (
                 <Card title="Top Skills">
                   <div className="flex flex-wrap gap-2">

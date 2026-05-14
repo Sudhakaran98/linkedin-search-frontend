@@ -25,6 +25,9 @@ export interface ProfileCard {
   total_experience_duration_months?: number;
   linkedin_url?: string;
   score?: ProfileScore;
+  salesql_emails?: SalesqlEmail[];
+  salesql_phones?: SalesqlPhone[];
+  salesql_enriched_at?: string;
 }
 
 export interface SearchProfilesRequest {
@@ -63,6 +66,34 @@ export interface CompanyCategoriesResponse {
   page: number;
   totalPages: number;
   pageSize: number;
+}
+
+export interface SalesqlEmail {
+  email: string;
+  type?: string;
+  status?: string;
+}
+
+export interface SalesqlPhone {
+  phone: string;
+  type?: string;
+  country_code?: string;
+  is_valid?: boolean;
+}
+
+export interface EnrichProfilesRequest {
+  linkedin_urls: string[];
+}
+
+export interface EnrichContactResult {
+  emails: SalesqlEmail[];
+  phones: SalesqlPhone[];
+  cached?: boolean;
+  error?: string;
+}
+
+export interface EnrichProfilesResponse {
+  results: Record<string, EnrichContactResult>;
 }
 
 export interface UpdateGenderRequest {
@@ -131,6 +162,9 @@ export interface ProfileDetail {
   experiences?: Experience[];
   educations?: Education[];
   skills?: Skill[];
+  salesql_emails?: SalesqlEmail[];
+  salesql_phones?: SalesqlPhone[];
+  salesql_enriched_at?: string;
 }
 
 export const searchApi = createApi({
@@ -182,6 +216,13 @@ export const searchApi = createApi({
       }),
       invalidatesTags: ['Profiles'],
     }),
+    enrichProfiles: builder.mutation<EnrichProfilesResponse, EnrichProfilesRequest>({
+      query: (body) => ({
+        url: '/search/profiles/enrich',
+        method: 'POST',
+        body,
+      }),
+    }),
   }),
 });
 
@@ -191,4 +232,5 @@ export const {
   useLazyGetLocationsQuery,
   useLazyGetCompanyCategoriesQuery,
   useUpdateGenderMutation,
+  useEnrichProfilesMutation,
 } = searchApi;
